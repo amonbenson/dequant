@@ -113,6 +113,36 @@ def read_midi(midi_path: Path, tempo_bpm):
     pitch_to_row = {p: i for i, p in enumerate(pitch_categories)}
     pitch_rows = np.array([pitch_to_row[p] for p in grouped_pitches])
 
+    # Handle duplicates: if multiple hits quantize to same (instrument, timestep),
+    # keep only the one with highest velocity
+    if len(pitch_rows) > 0:
+        # Create composite key for each note: (instrument_row, timestep)
+        composite_keys = np.column_stack((pitch_rows, nearest_idc))
+
+        # Find unique positions and indices
+        unique_positions, inverse_indices = np.unique(
+            composite_keys, axis=0, return_inverse=True
+        )
+
+        # For each unique position, find the note with maximum velocity
+        selected_indices = []
+        for i in range(len(unique_positions)):
+            # Get all indices that map to this unique position
+            duplicate_mask = inverse_indices == i
+            duplicate_indices = np.where(duplicate_mask)[0]
+
+            # Select the one with highest velocity
+            max_vel_idx = duplicate_indices[np.argmax(velocities[duplicate_indices])]
+            selected_indices.append(max_vel_idx)
+
+        selected_indices = np.array(selected_indices)
+
+        # Filter arrays to keep only selected notes (loudest for each position)
+        pitch_rows = pitch_rows[selected_indices]
+        nearest_idc = nearest_idc[selected_indices]
+        offset_relative = offset_relative[selected_indices]
+        velocities = velocities[selected_indices]
+
     # Pre-allocate grids (optimization #4)
     onset_grid = np.zeros((len(pitch_categories), n_grid_onsets), dtype=np.uint8)
     offset_grid = np.zeros_like(onset_grid, dtype=np.float32)
