@@ -8,104 +8,63 @@ from pathlib import Path
 import pretty_midi
 import time
 from tqdm import tqdm
+from dataclasses import dataclass, field
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import logging
 import os
 
 logger = logging.getLogger("preprocess")
 
-# Constants
-N_INSTRUMENTS = 9
+
+@dataclass
+class DrumCategory:
+    label: str
+    pitches: tuple[int]
 
 
-def pitch_to_category(pitches):
-    """
-    Maps the Midi pitch values 0 - 127 to the Drum category according to the Paper's Appendix B
-    Optimized with NumPy vectorization for better performance
-    """
-
-    # Pre-allocate output array
-    categories = np.zeros(len(pitches), dtype=np.int32)
-
-    # Define mapping as two arrays for vectorized operation
-    pitch_map = np.array([
-        36,
-        38,
-        40,
-        37,
-        48,
-        50,
-        45,
-        47,
-        43,
-        58,
-        46,
-        26,
-        42,
-        22,
-        44,
-        49,
-        55,
-        57,
-        52,
-        51,
-        59,
-        53,
-        54,
-        39,
-        56,
-    ])
-    category_map = np.array([
-        36,
-        38,
-        38,
-        38,
-        50,
-        50,
-        47,
-        47,
-        43,
-        43,
-        46,
-        46,
-        42,
-        42,
-        42,
-        49,
-        49,
-        49,
-        49,
-        51,
-        51,
-        51,
-        42,
-        38,
-        51,
-    ])
-
-    # Vectorized lookup
-    pitches_array = np.array(pitches)
-    for pitch_val, cat_val in zip(pitch_map, category_map):
-        categories[pitches_array == pitch_val] = cat_val
-
-    # Check for unmapped pitches
-    unmapped_mask = (categories == 0) & (pitches_array != 0)
-    if np.any(unmapped_mask):
-        unmapped_pitches = pitches_array[unmapped_mask]
-        for pitch in np.unique(unmapped_pitches):
-            logger.warning(f"{pitch} not in mapping")
-
-    # Validate number of instruments
-    n_instruments = len(np.unique(category_map))
-    if n_instruments != N_INSTRUMENTS:
-        raise ValueError(
-            "Global constant N_INSTRUMENTS does not fit unique values in mapping dict"
-        )
-
-    return categories
+# See https://musescore.org/sites/musescore.org/files/General%20MIDI%20Standard%20Percussion%20Set%20Key%20Map.pdf
+DEFAULT_DRUM_CATEGORIES = [
+    DrumCategory("Kick", (35, 36)),
+    DrumCategory("Snare", (37, 38, 40)),
+    DrumCategory("Floor Tom", (41, 43)),
+    DrumCategory("Low Tom", (45, 47)),
+    DrumCategory("High Tom", (48, 50)),
+    DrumCategory("Closed Hi-Hat", (42, 44)),
+    DrumCategory("Open Hi-Hat", (46,)),
+    DrumCategory("Crash", (49, 52, 55, 57)),
+    DrumCategory("Ride", (51, 53, 59)),
+]
 
 
-def read_midi(midi_path: Path, tempo_bpm):
+@dataclass
+class MidiConfig:
+    categories: list[DrumCategory] = field(
+        default_factory=lambda: DEFAULT_DRUM_CATEGORIES
+    )
+    resolution: int = 4  # steps per beat (4 steps per beat == 16 steps per bar)
+    _category_lookup: np.ndarray = field(init=False)
+
+    def __post_init__(self):
+        # initialize the category lookup table
+        self._category_lookup = -np.ones(128, dtype=np.int8)
+        for i, cat in enumerate(self.categories):
+            for pitch in cat.pitches:
+                if pitch < 0 or pitch > 127:
+                    raise ValueError(
+                        f"Category {cat.label}: pitch {pitch} is out of range."
+                    )
+                if self._category_lookup[pitch] != -1:
+                    raise ValueError(
+                        f"Category: {cat.label}: pitch {pitch} was already mapped to another category. Category pitches must be unique!"
+                    )
+                self._category_lookup[pitch] = i
+
+
+def read_midi(
+    midi_obj: Path | pretty_midi.PrettyMidi,
+    tempo_bpm: int,
+    config: MidiConfig = MidiConfig(),
+):
     """
     Read MIDI file and extract all needed data
 
@@ -116,10 +75,14 @@ def read_midi(midi_path: Path, tempo_bpm):
     Returns:
         Stacked matrices (3, n_instruments, n_timesteps) containing onset, offset, and velocity grids
     """
-    try:
-        midi_data = pretty_midi.PrettyMIDI(midi_path)
-    except Exception as e:
-        raise ValueError(f"Failed to parse MIDI file {midi_path}: {e}")
+    # Check if a midi object was passed directly or we should read it from a file
+    if isinstance(midi_obj, pretty_midi.PrettyMIDI):
+        midi_data = midi_obj
+    else:
+        try:
+            midi_data = pretty_midi.PrettyMIDI(midi_obj)
+        except Exception as e:
+            raise ValueError(f"Failed to parse MIDI file {midi_obj}: {e}")
 
     # Get drum track (should be only drum track)
     drum_track = None
@@ -129,46 +92,51 @@ def read_midi(midi_path: Path, tempo_bpm):
             break
 
     if drum_track is None:
-        raise ValueError(f"No drum track found in {midi_path}")
+        raise ValueError(f"No drum track found in {midi_obj}")
 
     # iterate over notes
     onsets = []
     pitches = []
     velocities = []
     for note in drum_track.notes:
-        onsets.append(note.start)
-        pitches.append(note.pitch)
-        velocities.append(note.velocity)
+        if note.velocity > 0:
+            onsets.append(note.start)
+            pitches.append(note.pitch)
+            velocities.append(note.velocity)
 
     # sort by onset time
     sort_idx = np.argsort(onsets)
     onsets = np.array(onsets)[sort_idx]
     pitches = np.array(pitches)[sort_idx]
-    velocities = np.array(velocities)[sort_idx] / 126.0
+    velocities = np.array(velocities)[sort_idx] / 127.0
 
     # Cache repeated calculations (optimization #6)
     bps = tempo_bpm / 60.0  # beats per second
-    sixteenth_ps = bps * 4  # sixteenth notes per second
-    step = 1.0 / sixteenth_ps
+    steps_per_bar = (
+        config.resolution * 4
+    )  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
+    steps_ps = bps * config.resolution  # steps per second
+    step = 1.0 / steps_ps
 
     # get vector / grid length for binary Matrix
     last_onset = onsets[-1]  # in sec
-    n_grid_onsets = int(last_onset * sixteenth_ps) + 2  # TODO should only be +1; bug?
+    n_grid_onsets = int(last_onset * steps_ps) + 1
+
+    # extend n_grid_onsets to a full number of bars (15 -> 16, 16 -> 16, 17 -> 32, ...)
+    if n_grid_onsets % steps_per_bar != 0:
+        n_grid_onsets += steps_per_bar - n_grid_onsets % steps_per_bar
 
     # snap to grid
-    nearest_idc = np.rint(onsets * sixteenth_ps).astype(
+    nearest_idc = np.rint(onsets * steps_ps).astype(
         np.int32
     )  # get snapped onsets as grid indices
     nearest = nearest_idc * step  # snapped values
 
     offsets = np.abs(onsets - nearest)  # timing derivations ('feel')
-    offset_relative = offsets * sixteenth_ps  # relative to grid, not in seconds
+    offset_relative = offsets * steps_ps  # relative to grid, not in seconds
 
     # create instrument grouped array --> "round" different drum parts (ride bell, ride edge --> ride)
-    grouped_pitches = pitch_to_category(pitches)
-    pitch_categories = np.array([36, 38, 50, 47, 43, 46, 42, 49, 51])
-    pitch_to_row = {p: i for i, p in enumerate(pitch_categories)}
-    pitch_rows = np.array([pitch_to_row[p] for p in grouped_pitches])
+    pitch_rows = config._category_lookup[pitches]
 
     # Handle duplicates: if multiple hits quantize to same (instrument, timestep),
     # keep only the one with highest velocity
@@ -201,14 +169,15 @@ def read_midi(midi_path: Path, tempo_bpm):
         velocities = velocities[selected_indices]
 
     # Pre-allocate grids (optimization #4)
-    onset_grid = np.zeros((len(pitch_categories), n_grid_onsets), dtype=np.uint8)
-    offset_grid = np.zeros_like(onset_grid, dtype=np.float32)
-    vel_grid = np.zeros_like(onset_grid, dtype=np.float32)
+    # Note: onsets also use float32, because torch uses float32 internally
+    onset_grid = np.zeros((n_grid_onsets, len(config.categories)), dtype=np.float32)
+    offset_grid = np.zeros_like(onset_grid)
+    vel_grid = np.zeros_like(onset_grid)
 
     # Single assignment operation for each grid
-    onset_grid[pitch_rows, nearest_idc] = 1
-    offset_grid[pitch_rows, nearest_idc] = offset_relative
-    vel_grid[pitch_rows, nearest_idc] = velocities
+    onset_grid[nearest_idc, pitch_rows] = 1
+    offset_grid[nearest_idc, pitch_rows] = offset_relative
+    vel_grid[nearest_idc, pitch_rows] = velocities
 
     # Stack matrices (fix for np.concat bug)
     matrices = np.stack([onset_grid, offset_grid, vel_grid], axis=0)
@@ -216,18 +185,22 @@ def read_midi(midi_path: Path, tempo_bpm):
     return matrices
 
 
-def _process_midi_file(filepath, bpm):
+def _process_midi_file(filepath, bpm, config=MidiConfig()):
     """
     Process a single MIDI file - helper for parallel processing
     This function must be at module level to be picklable
     """
-    return read_midi(Path(filepath), bpm)
+    return read_midi(Path(filepath), bpm, config)
 
 
 FileInfos = list[tuple[os.PathLike, int]]
 
 
-def extract_matrices(file_infos: FileInfos, n_workers=None):
+def extract_matrices(
+    file_infos: FileInfos,
+    config: MidiConfig = MidiConfig(),
+    n_workers=None,
+):
     """
     Extract matrices from MIDI files with parallel processing
 
@@ -256,7 +229,7 @@ def extract_matrices(file_infos: FileInfos, n_workers=None):
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         # Submit all tasks
         futures = {
-            executor.submit(_process_midi_file, filepath, bpm): i
+            executor.submit(_process_midi_file, filepath, bpm, config): i
             for i, (filepath, bpm) in enumerate(file_infos)
         }
 
@@ -274,7 +247,12 @@ def extract_matrices(file_infos: FileInfos, n_workers=None):
     data.sort(key=lambda x: x[0])
     data = [item[1] for item in data]
 
+    # Pack data into a numpy array
+    data_np = np.empty(len(data), dtype=object)
+    for i, item in enumerate(data):
+        data_np[i] = item
+
     elapsed = time.perf_counter() - start
     logger.info(f"Processed {len(file_infos)} MIDI files in {elapsed:.6f} seconds")
 
-    return data
+    return data_np

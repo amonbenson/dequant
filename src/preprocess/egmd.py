@@ -78,7 +78,4 @@ def preprocess(
 
         # Store the matrices as .npz
         logger.info(f"Saving '{data_filename}' ...")
-        data_array = np.empty(len(matrices), dtype=object)
-        for i, item in enumerate(matrices):
-            data_array[i] = item
-        np.savez_compressed(data_filename, data=data_array)
+        np.savez_compressed(data_filename, data=matrices)
