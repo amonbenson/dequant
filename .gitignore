@@ -218,4 +218,7 @@ __marimo__/
 # Generated notebook data
 /notebooks/output/
 
+# Ignore data directory
+/.data/
+
 .DS_Store
