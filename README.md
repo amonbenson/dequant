@@ -6,7 +6,7 @@ You'll need to have Python 3.11 or higher installed. Create a virtual environmen
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
+source .venv/bin/activate  # On Windows use `.venv\Scripts\Activate.ps1`
 
 pip install --upgrade pip
 pip install -r requirements-torch-cuda.txt # If you have a CUDA-capable GPU
