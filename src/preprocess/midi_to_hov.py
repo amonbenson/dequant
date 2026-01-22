@@ -4,6 +4,7 @@ Optimized with parallel processing and vectorized operations
 """
 
 import numpy as np
+import json
 from pathlib import Path
 import pretty_midi
 import time
@@ -12,6 +13,7 @@ from dataclasses import dataclass, field
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import logging
 import os
+import traceback
 
 logger = logging.getLogger("preprocess")
 
@@ -38,13 +40,20 @@ DEFAULT_DRUM_CATEGORIES = [
 
 @dataclass
 class MidiConfig:
-    categories: list[DrumCategory] = field(
+    categories: str | list[DrumCategory] = field(
         default_factory=lambda: DEFAULT_DRUM_CATEGORIES
     )
     resolution: int = 4  # steps per beat (4 steps per beat == 16 steps per bar)
     _category_lookup: np.ndarray = field(init=False)
 
     def __post_init__(self):
+        # convert categories from json string to proper object
+        if isinstance(self.categories, str):
+            self.categories = [
+                DrumCategory(c["label"], c["pitches"])
+                for c in json.loads(self.categories)
+            ]
+
         # initialize the category lookup table
         self._category_lookup = -np.ones(128, dtype=np.int8)
         for i, cat in enumerate(self.categories):
@@ -119,8 +128,10 @@ def read_midi(
     step = 1.0 / steps_ps
 
     # get vector / grid length for binary Matrix
+    # We add +2 to the last onset, because it might get shifted one extra step if its
+    # timing deviation is large enough.
     last_onset = onsets[-1]  # in sec
-    n_grid_onsets = int(last_onset * steps_ps) + 1
+    n_grid_onsets = int(last_onset * steps_ps) + 2
 
     # extend n_grid_onsets to a full number of bars (15 -> 16, 16 -> 16, 17 -> 32, ...)
     if n_grid_onsets % steps_per_bar != 0:
@@ -241,6 +252,7 @@ def extract_matrices(
                 data.append((idx, result))
             except Exception as e:
                 logger.error(f"Error processing file at index {idx}: {e}")
+                traceback.print_exc()
                 data.append((idx, None))
 
     # Sort by original index to maintain order

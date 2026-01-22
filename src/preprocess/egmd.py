@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass
 from .download import download_file, unzip_file
-from .midi_to_hov import extract_matrices
+from .midi_to_hov import extract_matrices, MidiConfig
 
 logger = logging.getLogger("egmd")
 
@@ -16,7 +16,10 @@ class EGMDConfig:
 
 
 def preprocess(
-    tmp_dir: os.PathLike, hov_dir: os.PathLike, config: EGMDConfig = EGMDConfig()
+    tmp_dir: os.PathLike,
+    hov_dir: os.PathLike,
+    midi_config: MidiConfig = MidiConfig(),
+    config: EGMDConfig = EGMDConfig(),
 ):
     midi_filename = os.path.join(tmp_dir, "egmd-midi.zip")
     meta_filename = os.path.join(tmp_dir, "egmd-meta.csv")
@@ -74,7 +77,7 @@ def preprocess(
 
         # Run the parallel preprocesser
         logger.info(f"Extracing split '{split_name}' ...")
-        matrices = extract_matrices(file_infos)
+        matrices = extract_matrices(file_infos, midi_config)
 
         # Store the matrices as .npz
         logger.info(f"Saving '{data_filename}' ...")
