@@ -2,7 +2,7 @@
 
 ## Environment Setup
 
-You'll need to have Python 3.10 or higher installed. Create a virtual environment and install the required packages:
+You'll need to have Python 3.11 or higher installed. Create a virtual environment and install the required packages:
 
 ```bash
 python3 -m venv .venv
