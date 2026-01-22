@@ -61,7 +61,7 @@ class MidiConfig:
 
 
 def read_midi(
-    midi_obj: Path | pretty_midi.PrettyMidi,
+    midi_obj: Path | pretty_midi.PrettyMIDI,
     tempo_bpm: int,
     config: MidiConfig = MidiConfig(),
 ):

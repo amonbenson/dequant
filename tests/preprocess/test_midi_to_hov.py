@@ -99,13 +99,11 @@ def test_velocities():
     ])
     hov = read_midi(sequence, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
 
-    # fmt: off
-
     # Check velocities for each instrument
+    # fmt: off
     assert hov[2, :, 0].tolist() == pytest.approx([64/127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100/127, 0, 0, 0, 0, 0])
     assert hov[2, :, 1].tolist() == pytest.approx([0, 0, 0, 0, 100/127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     assert hov[2, :, 2].tolist() == pytest.approx([0, 0, 0, 0, 0, 1/127, 20/127, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-
     # fmt: on
 
     # Make sure that velocity 0 results in no hit
