@@ -1,0 +1,15 @@
+[project]
+name = "dequant"
+version = "0.14.13"
+description = "Drum Dequantization"
+authors = [
+    { name = "Amon Benson", email = "amon.k.benson@campus.tu-berlin.de" },
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+
+[tool.ruff]
+exclude = ["notebooks/"]
+
+[tool.ruff.format]

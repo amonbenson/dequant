@@ -11,4 +11,5 @@ source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
 pip install --upgrade pip
 pip install -r requirements-torch-cuda.txt # If you have a CUDA-capable GPU
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
