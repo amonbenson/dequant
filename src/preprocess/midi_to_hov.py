@@ -132,7 +132,7 @@ def read_midi(
     )  # get snapped onsets as grid indices
     nearest = nearest_idc * step  # snapped values
 
-    offsets = np.abs(onsets - nearest)  # timing derivations ('feel')
+    offsets = onsets - nearest  # timing derivations ('feel')
     offset_relative = offsets * steps_ps  # relative to grid, not in seconds
 
     # create instrument grouped array --> "round" different drum parts (ride bell, ride edge --> ride)

@@ -85,6 +85,24 @@ def test_hits():
     assert np.flatnonzero(hov[0, :, 2]).tolist() == [13, 15]  # Hi-Hat
 
 
+def test_offsets():
+    sequence = create_sequence([
+        DrumHit(2 / 8, 36),
+        DrumHit(4.2 / 8, 36),
+        DrumHit(6.4 / 8, 36),
+        DrumHit(8.6 / 8, 36),
+        DrumHit(10.8 / 8, 36),
+        DrumHit(13 / 8, 36),
+    ])
+    hov = read_midi(sequence, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
+
+    # Check hit positions and corresponding offsets
+    # fmt: off
+    assert hov[0, :, 0].tolist() == pytest.approx([0, 0, 1, 0, 1,   0, 1,   0, 0,  1,   0,  1,   0, 1, 0, 0])
+    assert hov[1, :, 0].tolist() == pytest.approx([0, 0, 0, 0, 0.2, 0, 0.4, 0, 0, -0.4, 0, -0.2, 0, 0, 0, 0])
+    # fmt: on
+
+
 def test_velocities():
     sequence = create_sequence([
         DrumHit(0 / 8, 35, 64),  # Kick
