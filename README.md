@@ -1,5 +1,7 @@
 # Drum Dequantization
 
+[![CI](https://github.com/amonbenson/dequant/actions/workflows/ci.yaml/badge.svg)](https://github.com/amonbenson/dequant/actions/workflows/ci.yaml)
+
 ## Environment Setup
 
 You'll need to have Python 3.11 or higher installed. Create a virtual environment and install the required packages:
