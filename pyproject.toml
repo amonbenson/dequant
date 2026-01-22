@@ -9,6 +9,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 
+[tool.pytest.ini_options]
+pythonpath = ["."]  # Include src directory as a module
+addopts = ["--capture=no"]  # Always print test output
+
 [tool.ruff]
 preview = true
 exclude = ["notebooks/"]

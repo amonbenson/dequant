@@ -58,8 +58,8 @@ def test_dequant_overfitting():
         loss.backward()
         optimizer.step()
 
-    if epoch % 100 == 0:
-        print(f"Epoch {epoch}, Loss: {loss.item():.6f}")
+        if epoch % 100 == 0:
+            print(f"Epoch {epoch}, Loss: {loss.item():.6f}")
 
     # Run evaluation on the first dataset sample
     # Normally, this is a no-no, but because we are intentionally overfitting,
