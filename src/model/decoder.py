@@ -1,13 +1,19 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from dataclasses import dataclass
+
+
+@dataclass
+class DecoderConfig:
+    d_model: int
 
 
 class Decoder(nn.Module):
-    def __init__(self, d_model, max_seq_len):
+    def __init__(self, config: DecoderConfig):
         super().__init__()
-        self.d_model = d_model
-        self.max_seq_len = max_seq_len
+        self.config = config
+        d_model = config.d_model
 
         # Causal self-attention
         self.self_qkv_proj = nn.Linear(d_model, 3 * d_model)
@@ -20,7 +26,9 @@ class Decoder(nn.Module):
 
         # Feed-forward
         self.ffn = nn.Sequential(
-            nn.Linear(d_model, 4 * d_model), nn.GELU(), nn.Linear(4 * d_model, d_model)
+            nn.Linear(d_model, 4 * d_model),
+            nn.GELU(),
+            nn.Linear(4 * d_model, d_model),
         )
 
         # Layer norms
@@ -28,17 +36,17 @@ class Decoder(nn.Module):
         self.ln2 = nn.LayerNorm(d_model)
         self.ln3 = nn.LayerNorm(d_model)
 
-    def forward(self, x, encoder_output):
-        batch_size, seq_len, _ = x.shape
+    def forward(self, x: torch.Tensor, encoder_output: torch.Tensor) -> torch.Tensor:
+        _batch_size, seq_len, _ = x.shape
 
         # Causal self-attention on decoder sequence
         residual = x
         x = self.ln1(x)
 
-        qkv = self.self_qkv_proj(x)
+        qkv: torch.Tensor = self.self_qkv_proj(x)
         q, k, v = qkv.chunk(3, dim=-1)
 
-        attn = (q @ k.transpose(-2, -1)) / np.sqrt(self.d_model)
+        attn: torch.Tensor = (q @ k.transpose(-2, -1)) / np.sqrt(self.config.d_model)
         causal_mask = torch.triu(
             torch.ones(seq_len, seq_len, device=x.device), diagonal=1
         ).bool()
@@ -53,11 +61,11 @@ class Decoder(nn.Module):
         residual = x
         x = self.ln2(x)
 
-        q = self.cross_q_proj(x)  # Q from decoder
-        kv = self.cross_kv_proj(encoder_output)  # K, V from encoder
+        q: torch.Tensor = self.cross_q_proj(x)  # Q from decoder
+        kv: torch.Tensor = self.cross_kv_proj(encoder_output)  # K, V from encoder
         k, v = kv.chunk(2, dim=-1)
 
-        attn = (q @ k.transpose(-2, -1)) / np.sqrt(self.d_model)
+        attn = (q @ k.transpose(-2, -1)) / np.sqrt(self.config.d_model)
         attn = torch.softmax(attn, dim=-1)
 
         x = attn @ v

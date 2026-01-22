@@ -1,13 +1,19 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from dataclasses import dataclass
+
+
+@dataclass
+class EncoderConfig:
+    d_model: int
 
 
 class Encoder(nn.Module):
-    def __init__(self, d_model: int, max_seq_len: int):
+    def __init__(self, config: EncoderConfig):
         super().__init__()
-        self.d_model = d_model
-        self.max_seq_len = max_seq_len
+        self.config = config
+        d_model = config.d_model
 
         # Self-attention (bidirectional, no causal mask)
         self.qkv_proj = nn.Linear(d_model, 3 * d_model)
@@ -15,22 +21,24 @@ class Encoder(nn.Module):
 
         # Feed-forward
         self.ffn = nn.Sequential(
-            nn.Linear(d_model, 4 * d_model), nn.GELU(), nn.Linear(4 * d_model, d_model)
+            nn.Linear(d_model, 4 * d_model),
+            nn.GELU(),
+            nn.Linear(4 * d_model, d_model),
         )
 
         # Layer norms
         self.ln1 = nn.LayerNorm(d_model)
         self.ln2 = nn.LayerNorm(d_model)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Bidirectional self-attention
         residual = x
         x = self.ln1(x)
 
-        qkv = self.qkv_proj(x)
+        qkv: torch.Tensor = self.qkv_proj(x)
         q, k, v = qkv.chunk(3, dim=-1)
 
-        attn = (q @ k.transpose(-2, -1)) / np.sqrt(self.d_model)
+        attn: torch.Tensor = (q @ k.transpose(-2, -1)) / np.sqrt(self.config.d_model)
         attn = torch.softmax(attn, dim=-1)
 
         x = attn @ v
