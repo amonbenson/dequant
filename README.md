@@ -21,11 +21,19 @@ pip install -r requirements-dev.txt
 To start downloading and preprocessing the E-GMD-dataset to the default location (`.data/`), run:
 
 ```shell
-python -m src.preprocess
+python -m src preprocess
 ```
 
-To see a list of available commands, type:
+## Training
 
 ```shell
-python -m src.preprocess --help
+python -m src train
+```
+
+## Configuration
+
+To see a list of available commands and configuration options, type:
+
+```shell
+python -m src --help
 ```
