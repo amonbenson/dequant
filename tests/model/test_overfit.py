@@ -35,15 +35,15 @@ def test_dequant_overfitting():
     ])
 
     # Dissect the overfitting dataset into model input and target
-    encoder_input = dataset_input
+    encoder_input = dataset_input[..., 0]  # use hits only
     decoder_input = torch.cat(
         [
-            torch.zeros(2, 1, 2, 3),  # Start token
-            dataset_target[:, :-1],  # Shift right along the seq_len dimension
+            torch.zeros(2, 1, 2, 2),  # Start token
+            dataset_target[:, :-1, :, 1:],  # Shift right along the seq_len dimension
         ],
         dim=1,
     )
-    decoder_target = dataset_target
+    decoder_target = dataset_target[..., 1:]
 
     # Create model and a basic optimizer
     model = Dequant(DequantConfig(max_seq_len=4, num_instruments=2))

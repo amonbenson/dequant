@@ -18,24 +18,36 @@ class Dequant(nn.Module):
 
         # HOV representation requires 3 values per instrument
         d_model = config.num_instruments * 3
+        d_encoder = config.num_instruments  # only hits
+        d_decoder = config.num_instruments * 2  # offsets + velocities per instrument
 
         # Encoder and decoder blocks
-        self.encoder = Encoder(EncoderConfig(d_model=d_model))
-        self.decoder = Decoder(DecoderConfig(d_model=d_model))
+        self.encoder = Encoder(EncoderConfig(d_model=d_encoder))
+        self.decoder = Decoder(DecoderConfig(d_model=d_decoder, d_cross=d_encoder))
 
         # Output projection
-        self.output_proj = nn.Linear(d_model, d_model)
+        self.output_proj = nn.Linear(d_decoder, d_decoder)
         self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
 
     def forward(
         self, encoder_input: torch.Tensor, decoder_input: torch.Tensor
     ) -> torch.Tensor:
-        batch_size, seq_len, num_instruments, hov_size = encoder_input.shape
+        batch_size, seq_len, num_instruments = encoder_input.shape
 
         assert seq_len <= self.config.max_seq_len, "max_seq_len exceeded."
         assert num_instruments == self.config.num_instruments
-        assert hov_size == 3
+
+        assert decoder_input.shape[0] == encoder_input.shape[0], (
+            "inconsistent batch size"
+        )
+        assert decoder_input.shape[1] == encoder_input.shape[1], (
+            "inconsistent sequence length"
+        )
+        assert decoder_input.shape[2] == encoder_input.shape[2], (
+            "inconsistent number of instruments"
+        )
+        assert decoder_input.shape[3] == 2, "decoder input must have OV representations"
 
         # Flatten to d_model dimension
         encoder_flat = encoder_input.flatten(start_dim=2)
@@ -49,12 +61,12 @@ class Dequant(nn.Module):
 
         # Project and reshape
         y = self.output_proj(y)
-        y = y.reshape(batch_size, seq_len, num_instruments, hov_size)
+        y = y.reshape(batch_size, seq_len, num_instruments, 2)
 
         # Apply different activations to hits, offsets, and velocities
-        hits: torch.Tensor = self.sigmoid(y[..., 0:1])
-        offsets: torch.Tensor = 0.5 * self.tanh(y[..., 1:2])
-        velocities: torch.Tensor = self.sigmoid(y[..., 2:3])
+        # hits: torch.Tensor = self.sigmoid(y[..., 0:1])
+        offsets: torch.Tensor = 0.5 * self.tanh(y[..., 0:1])
+        velocities: torch.Tensor = self.sigmoid(y[..., 1:2])
 
         # Concatenate along last dimension
-        return torch.cat([hits, offsets, velocities], dim=-1)
+        return torch.cat([offsets, velocities], dim=-1)
