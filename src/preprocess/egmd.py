@@ -2,39 +2,35 @@ import os
 import logging
 import pandas as pd
 import numpy as np
-from dataclasses import dataclass
 from .download import download_file, unzip_file
-from .midi_to_hov import extract_matrices, MidiConfig
+from ..hov.converter import HOVConverter, HOVConverterConfig
+from ..config import CONFIG
 
 logger = logging.getLogger("egmd")
 
 
-@dataclass
-class EGMDConfig:
-    midi_url: str = "https://storage.googleapis.com/magentadata/datasets/e-gmd/v1.0.0/e-gmd-v1.0.0-midi.zip"
-    meta_url: str = "https://storage.googleapis.com/magentadata/datasets/e-gmd/v1.0.0/e-gmd-v1.0.0.csv"
+def preprocess_egmd():
+    converter = HOVConverter(
+        HOVConverterConfig(
+            resolution=CONFIG.model.resolution,
+            categories=CONFIG.model.categories,
+        )
+    )
 
-
-def preprocess(
-    tmp_dir: os.PathLike,
-    hov_dir: os.PathLike,
-    midi_config: MidiConfig = MidiConfig(),
-    config: EGMDConfig = EGMDConfig(),
-):
-    midi_filename = os.path.join(tmp_dir, "egmd-midi.zip")
-    meta_filename = os.path.join(tmp_dir, "egmd-meta.csv")
+    midi_filename = CONFIG.tmp_dir / "egmd-midi.zip"
+    meta_filename = CONFIG.tmp_dir / "egmd-meta.csv"
 
     # Create tmp directory for downloading files
-    os.makedirs(tmp_dir, exist_ok=True)
+    os.makedirs(CONFIG.tmp_dir, exist_ok=True)
 
     # Download midi and meta data
-    logger.info(f"Downloading to '{tmp_dir}' ...")
-    download_file(config.midi_url, midi_filename)
-    download_file(config.meta_url, meta_filename)
+    logger.info(f"Downloading to '{CONFIG.tmp_dir}' ...")
+    download_file(CONFIG.preprocess.egmd.midi_url, midi_filename)
+    download_file(CONFIG.preprocess.egmd.meta_url, meta_filename)
 
     # Unzip midi dataset
     logger.info("Unzipping midi files...")
-    midi_dir = os.path.splitext(midi_filename)[0]
+    midi_dir = midi_filename.with_suffix("")
     unzip_file(midi_filename, midi_dir)
 
     # Read the CSV file
@@ -55,12 +51,12 @@ def preprocess(
     # run preprocessing for each split
     for split_name, df in df_splits.items():
         # Create split directory
-        split_dir = os.path.join(hov_dir, split_name)
+        split_dir = CONFIG.dataset_dir / split_name
         os.makedirs(split_dir, exist_ok=True)
 
         # Skip if the target already exists
-        data_filename = os.path.join(split_dir, "egmd.npz")
-        if os.path.exists(data_filename):
+        data_filename = split_dir / "egmd.npz"
+        if data_filename.exists():
             logger.info(
                 f"Skipping preprocessing, because the target file '{data_filename}' already exists."
             )
@@ -69,7 +65,7 @@ def preprocess(
         # Convert df entries to file info list
         file_infos = [
             (
-                os.path.join(midi_dir, "e-gmd-v1.0.0", row.midi_filename),
+                midi_dir / "e-gmd-v1.0.0" / row.midi_filename,
                 row.bpm,
             )
             for row in df.itertuples(index=False)
@@ -77,7 +73,7 @@ def preprocess(
 
         # Run the parallel preprocesser
         logger.info(f"Extracing split '{split_name}' ...")
-        matrices = extract_matrices(file_infos, midi_config)
+        matrices = converter.midi_to_hov_batch(file_infos)
 
         # Store the matrices as .npz
         logger.info(f"Saving '{data_filename}' ...")

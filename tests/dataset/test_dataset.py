@@ -1,5 +1,5 @@
 import numpy as np
-from src.dataset.dataset import HOVDataset, HOVDatasetConfig
+from src.hov.dataset import HOVDataset, HOVDatasetConfig
 from tests.utils import create_dummy_hov, create_dummy_dataset
 
 

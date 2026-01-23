@@ -1,4 +1,3 @@
-import os
 import torch
 from torch.utils.data import Dataset
 import numpy as np
@@ -12,7 +11,7 @@ logger = logging.getLogger("dataset")
 
 @dataclass
 class HOVDatasetConfig:
-    hov_dir: os.PathLike
+    hov_dir: Path
     seq_len: int = 128
     step_size: Optional[int] = None
     trim: bool = True
