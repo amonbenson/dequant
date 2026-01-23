@@ -73,6 +73,11 @@ class HOVDataset(Dataset):
                 )
 
             self._chunks = self._chunks[start:end]
+            self._trim_start = start.item()
+            self._trim_end = end.item()
+        else:
+            self._trim_start = 0
+            self._trim_end = len(self)
 
     def __len__(self) -> int:
         return len(self._chunks)
@@ -83,3 +88,14 @@ class HOVDataset(Dataset):
     @property
     def raw_data(self) -> torch.Tensor:
         return self._data
+
+    @property
+    def trim_start(self) -> int:
+        return self._trim_start
+
+    @property
+    def trim_end(self) -> int:
+        return self._trim_end
+
+    def is_trimmed(self) -> bool:
+        return self._trim_start > 0 or self._trim_end < len(self)

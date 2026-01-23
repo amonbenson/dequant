@@ -18,6 +18,7 @@ def test_dataset_default_step_size():
         trim=False,
     )
 
+    assert not dataset.is_trimmed()
     assert len(dataset) == 2
     assert dataset[0].tolist() == dataset.raw_data[0:16].tolist()
     assert dataset[1].tolist() == dataset.raw_data[16:32].tolist()
@@ -83,6 +84,7 @@ def test_trim():
     )
 
     # 00000000_11111111_11111111_00000000 --> 0001_11111111_000
+    assert dataset.is_trimmed()
     assert len(dataset) == 9
     assert dataset[0].tolist() == raw_data[6:10].tolist()
     assert dataset[-1].tolist() == raw_data[22:26].tolist()
