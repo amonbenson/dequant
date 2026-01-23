@@ -191,7 +191,7 @@ def read_midi(
     vel_grid[nearest_idc, pitch_rows] = velocities
 
     # Stack matrices (fix for np.concat bug)
-    matrices = np.stack([onset_grid, offset_grid, vel_grid], axis=0)
+    matrices = np.stack([onset_grid, offset_grid, vel_grid], axis=-1)
 
     return matrices
 

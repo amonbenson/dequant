@@ -36,33 +36,33 @@ def test_single_kick():
     hov = read_midi(sequence, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
 
     # pattern should get extended to 16 steps, with 3 instruments each
-    assert hov.shape == (3, 16, 3)
+    assert hov.shape == (16, 3, 3)
 
     # check the single hit
     assert hov[0, 0, 0] == pytest.approx(1.0)
-    assert hov[1, 0, 0] == pytest.approx(0.0)
-    assert hov[2, 0, 0] == pytest.approx(1.0)
+    assert hov[0, 0, 1] == pytest.approx(0.0)
+    assert hov[0, 0, 2] == pytest.approx(1.0)
 
     # make sure no other bits are set
-    hov[:, 0, 0] = 0.0
+    hov[0, 0, :] = 0.0
     assert np.all(hov == 0)
 
 
 def test_pattern_length():
     seq1 = create_sequence([DrumHit(0 / 8, 36)])
-    seq2 = create_sequence([DrumHit(15 / 8, 36)])
-    seq3 = create_sequence([DrumHit(16 / 8, 36)])
-    seq4 = create_sequence([DrumHit(17 / 8, 36)])
+    seq2 = create_sequence([DrumHit(14 / 8, 36)])
+    seq3 = create_sequence([DrumHit(15 / 8, 36)])
+    seq4 = create_sequence([DrumHit(16 / 8, 36)])
 
     hov1 = read_midi(seq1, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
     hov2 = read_midi(seq2, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
     hov3 = read_midi(seq3, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
     hov4 = read_midi(seq4, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
 
-    assert hov1.shape[1] == 16
-    assert hov2.shape[1] == 16
-    assert hov3.shape[1] == 32
-    assert hov4.shape[1] == 32
+    assert len(hov1) == 16
+    assert len(hov2) == 16
+    assert len(hov3) == 32
+    assert len(hov4) == 32
 
 
 def test_hits():
@@ -71,18 +71,18 @@ def test_hits():
         DrumHit(0 / 8, 36),  # Kick
         DrumHit(3 / 8, 37),  # Snare
         DrumHit(4 / 8, 37),  # Snare
-        DrumHit(13 / 8, 42),  # Hi-Hat
-        DrumHit(15 / 8, 42),  # Hi-Hat
+        DrumHit(12 / 8, 42),  # Hi-Hat
+        DrumHit(14 / 8, 42),  # Hi-Hat
     ])
     hov = read_midi(sequence, 120, MidiConfig(categories=REDUCED_DRUM_CATEGORIES))
 
     # Should still be 16 steps
-    assert hov.shape == (3, 16, 3)
+    assert hov.shape == (16, 3, 3)
 
     # Check locations of hits for each instrument
-    assert np.flatnonzero(hov[0, :, 0]).tolist() == [0]  # Kick
-    assert np.flatnonzero(hov[0, :, 1]).tolist() == [3, 4]  # Snare
-    assert np.flatnonzero(hov[0, :, 2]).tolist() == [13, 15]  # Hi-Hat
+    assert np.flatnonzero(hov[:, 0, 0]).tolist() == [0]  # Kick
+    assert np.flatnonzero(hov[:, 1, 0]).tolist() == [3, 4]  # Snare
+    assert np.flatnonzero(hov[:, 2, 0]).tolist() == [12, 14]  # Hi-Hat
 
 
 def test_offsets():
@@ -98,8 +98,8 @@ def test_offsets():
 
     # Check hit positions and corresponding offsets
     # fmt: off
-    assert hov[0, :, 0].tolist() == pytest.approx([0, 0, 1, 0, 1,   0, 1,   0, 0,  1,   0,  1,   0, 1, 0, 0])
-    assert hov[1, :, 0].tolist() == pytest.approx([0, 0, 0, 0, 0.2, 0, 0.4, 0, 0, -0.4, 0, -0.2, 0, 0, 0, 0])
+    assert hov[:, 0, 0].tolist() == pytest.approx([0, 0, 1, 0, 1,   0, 1,   0, 0,  1,   0,  1,   0, 1, 0, 0])
+    assert hov[:, 0, 1].tolist() == pytest.approx([0, 0, 0, 0, 0.2, 0, 0.4, 0, 0, -0.4, 0, -0.2, 0, 0, 0, 0])
     # fmt: on
 
 
@@ -119,10 +119,10 @@ def test_velocities():
 
     # Check velocities for each instrument
     # fmt: off
-    assert hov[2, :, 0].tolist() == pytest.approx([64/127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100/127, 0, 0, 0, 0, 0])
-    assert hov[2, :, 1].tolist() == pytest.approx([0, 0, 0, 0, 100/127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    assert hov[2, :, 2].tolist() == pytest.approx([0, 0, 0, 0, 0, 1/127, 20/127, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert hov[:, 0, 2].tolist() == pytest.approx([64/127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100/127, 0, 0, 0, 0, 0])
+    assert hov[:, 1, 2].tolist() == pytest.approx([0, 0, 0, 0, 100/127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert hov[:, 2, 2].tolist() == pytest.approx([0, 0, 0, 0, 0, 1/127, 20/127, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     # fmt: on
 
     # Make sure that velocity 0 results in no hit
-    assert hov[0, 7, 2] == 0
+    assert hov[7, 2, 0] == 0

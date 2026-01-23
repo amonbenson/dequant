@@ -1,80 +1,64 @@
+import os
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+from pathlib import Path
+from dataclasses import dataclass
+import logging
+
+logger = logging.getLogger("dataset")
 
 
-class DrumDataset(Dataset):
-    """
-    Simple PyTorch Dataset for drum HVO (Hits, Velocities, Offsets) sequences.
+@dataclass
+class HOVDatasetConfig:
+    hov_dir: os.PathLike
+    seq_len: int = 128
+    overlap: int = 64
 
-    Loads pre-processed .npz files and transforms them for the transformer encoder.
+    def __post_init__(self):
+        if not (0 <= self.overlap < self.seq_len):
+            raise ValueError(f"Invalid overlap {self.overlap}")
+        if self.seq_len <= 0:
+            raise ValueError("seq_len must be > 0")
 
-    Input data format from .npz:
-        - Shape: (3, 9, n_timesteps)
-        - Axis 0: [hits, offsets, velocities]
-        - Axis 1: 9 drum instruments
-        - Axis 2: variable number of timesteps (16th notes)
 
-    Output format:
-        - Shape: (n_timesteps, 27)
-        - 27 features: [9 hits, 9 velocities, 9 offsets]
-    """
+class HOVDataset(Dataset):
+    def __init__(self, config: HOVDatasetConfig):
+        self.config = config
+        self._stride = config.seq_len - config.overlap
 
-    def __init__(self, npz_path):
-        """
-        Args:
-            npz_path (str): Path to .npz file containing preprocessed drum data
-        """
-        # Load data from .npz file
-        data = np.load(npz_path, allow_pickle=True)
-        self.sequences = data["data"]  # Object array of variable-length sequences
+        npz_files = sorted(Path(self.config.hov_dir).glob("*.npz"))
+        if not npz_files:
+            raise FileNotFoundError(
+                f"No .npz files found in {self.config.hov_dir}. Did you run preprocess?"
+            )
 
-        print(f"Loaded {len(self.sequences)} sequences from {npz_path}")
+        arrays = []
+        for filename in npz_files:
+            with np.load(filename) as f:
+                arrays.append(f)
 
-    def _transform_sequence(self, seq):
-        """
-        Transform from (3, 9, n_timesteps) to (n_timesteps, 27).
-
-        Input axes: [hits, offsets, velocities] x 9_instruments x n_timesteps
-        Output: n_timesteps x [h0,h1,...h8, v0,v1,...v8, o0,o1,...o8]
-
-        Note: The model expects the order as [hits, velocities, offsets] based on
-        the DrumLoss class splitting logic.
-        """
-        # seq shape: (3, 9, n_timesteps)
-        hits = seq[0]  # (9, n_timesteps)
-        offsets = seq[1]  # (9, n_timesteps)
-        velocities = seq[2]  # (9, n_timesteps)
-
-        # Transpose to (n_timesteps, 9)
-        hits = hits.T  # (n_timesteps, 9)
-        velocities = velocities.T
-        offsets = offsets.T
-
-        # Concatenate along feature dimension: [hits, velocities, offsets]
-        # This matches the DrumLoss expectation: [:,:,:9], [:,:,9:18], [:,:,18:]
-        transformed = np.concatenate(
-            [hits, velocities, offsets], axis=1
-        )  # (n_timesteps, 27)
-
-        return transformed
+        concatenated = np.concatenate(arrays, axis=0)
+        self._data = torch.from_numpy(concatenated).to(torch.float32)
 
     def __len__(self):
-        return len(self.sequences)
+        return (len(self._data) - self.config.seq_len) // self._stride + 1
 
-    def __getitem__(self, idx):
-        """
-        Get a single sequence.
+    def __getitem__(self, index: int) -> torch.Tensor:
+        if index < 0:
+            index += len(self)
+        if not 0 <= index <= len(self):
+            raise IndexError(f"Index {index} out of range")
 
-        Returns:
-            sequence: Tensor of shape (n_timesteps, 27)
-        """
-        seq = self.sequences[idx]  # (3, 9, n_timesteps)
+        start = index * self._stride
+        subsequence = self._data[start : start + self.config.seq_len]
 
-        # Transform to (n_timesteps, 27)
-        transformed = self._transform_sequence(seq)
+        return subsequence
 
-        # Convert to tensor
-        sequence = torch.from_numpy(transformed).float()
+    @property
+    def data(self) -> torch.Tensor:
+        return self._data
 
-        return sequence
+    @property
+    def shape(self) -> torch.Size:
+        return self._data.shape
