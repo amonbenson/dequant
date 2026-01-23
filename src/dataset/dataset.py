@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 import numpy as np
 from pathlib import Path
 from dataclasses import dataclass
+from typing import Optional
 import logging
 
 logger = logging.getLogger("dataset")
@@ -13,52 +14,72 @@ logger = logging.getLogger("dataset")
 class HOVDatasetConfig:
     hov_dir: os.PathLike
     seq_len: int = 128
-    overlap: int = 64
+    step_size: Optional[int] = None
+    trim: bool = True
 
     def __post_init__(self):
-        if not (0 <= self.overlap < self.seq_len):
-            raise ValueError(f"Invalid overlap {self.overlap}")
+        if self.step_size is None:
+            self.step_size = self.seq_len
+
+        if not (0 < self.step_size <= self.seq_len):
+            raise ValueError(f"Invalid step_size {self.step_size}")
         if self.seq_len <= 0:
             raise ValueError("seq_len must be > 0")
 
 
 class HOVDataset(Dataset):
-    def __init__(self, config: HOVDatasetConfig):
+    def __init__(self, config: HOVDatasetConfig, *, data: Optional[np.ndarray] = None):
         self.config = config
-        self._stride = config.seq_len - config.overlap
 
-        npz_files = sorted(Path(self.config.hov_dir).glob("*.npz"))
-        if not npz_files:
-            raise FileNotFoundError(
-                f"No .npz files found in {self.config.hov_dir}. Did you run preprocess?"
-            )
+        if data is not None:
+            # Use provided data
+            self._data = torch.from_numpy(data)
+        else:
+            # Load data from the configured directory
+            npz_files = sorted(Path(self.config.hov_dir).glob("*.npz"))
+            if not npz_files:
+                raise FileNotFoundError(
+                    f"No .npz files found in {self.config.hov_dir}. Did you run preprocess?"
+                )
 
-        arrays = []
-        for filename in npz_files:
-            with np.load(filename) as f:
-                arrays.append(f)
+            arrays = []
+            for filename in npz_files:
+                with np.load(filename) as f:
+                    arrays.append(f)
 
-        concatenated = np.concatenate(arrays, axis=0)
-        self._data = torch.from_numpy(concatenated).to(torch.float32)
+            concatenated = np.concatenate(arrays, axis=0)
+            self._data = torch.from_numpy(concatenated).to(torch.float32)
 
-    def __len__(self):
-        return (len(self._data) - self.config.seq_len) // self._stride + 1
+        # Validate the data shape (N, instruments, hov=3)
+        assert len(self._data.shape) == 3
+        assert self._data.shape[0] >= self.config.seq_len, (
+            f"Not enough data to generate sequences of length {self.config.seq_len}"
+        )
+        assert self._data.shape[2] == 3, "Expected HOV dimension to be of size 3"
+
+        # Unfold the data into separate chunks
+        unfolded = self._data.unfold(0, self.config.seq_len, self.config.step_size)
+        self._chunks = unfolded.movedim(-1, 1)  # move the chunk dimension to the start
+
+        # Trim empty chunks from the start and end
+        if self.config.trim:
+            non_empty = self._chunks.any(dim=(1, 2, 3)).int()
+            start = non_empty.argmax()
+            end = len(non_empty) - non_empty.flip(dims=(0,)).argmax()
+
+            if start >= end:
+                raise ValueError(
+                    "Cannot trim, because the dataset is completely empty!"
+                )
+
+            self._chunks = self._chunks[start:end]
+
+    def __len__(self) -> int:
+        return len(self._chunks)
 
     def __getitem__(self, index: int) -> torch.Tensor:
-        if index < 0:
-            index += len(self)
-        if not 0 <= index <= len(self):
-            raise IndexError(f"Index {index} out of range")
-
-        start = index * self._stride
-        subsequence = self._data[start : start + self.config.seq_len]
-
-        return subsequence
+        return self._chunks[index]
 
     @property
-    def data(self) -> torch.Tensor:
+    def raw_data(self) -> torch.Tensor:
         return self._data
-
-    @property
-    def shape(self) -> torch.Size:
-        return self._data.shape
