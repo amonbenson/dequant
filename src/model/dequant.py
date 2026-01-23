@@ -17,7 +17,6 @@ class Dequant(nn.Module):
         self.config = config
 
         # HOV representation requires 3 values per instrument
-        d_model = config.num_instruments * 3
         d_encoder = config.num_instruments  # only hits
         d_decoder = config.num_instruments * 2  # offsets + velocities per instrument
 
