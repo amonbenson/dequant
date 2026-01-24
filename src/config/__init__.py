@@ -1,11 +1,18 @@
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
+from typing import Optional
 from ..hov.converter import DrumCategory, DEFAULT_DRUM_CATEGORIES
 
 
 @dataclass
+class DatasetConfig:
+    dir: Path = Path(".data/dataset")
+    step_size: Optional[int] = None
+
+
+@dataclass
 class ModelConfig:
-    steps: int = 128
+    seq_len: int = 128
     instruments: int = 7
     resolution: int = 16
     categories: list[DrumCategory] = field(
@@ -28,13 +35,14 @@ class PreprocessConfig:
 
 @dataclass
 class TrainConfig:
-    pass
+    auto_preprocess: bool = True
+    step_size: Optional[int] = None
 
 
 @dataclass
 class MainConfig:
     tmp_dir: Path = Path(".data/tmp")
-    dataset_dir: Path = Path(".data/dataset")
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     preprocess: PreprocessConfig = field(default_factory=PreprocessConfig)
     train: TrainConfig = field(default_factory=TrainConfig)

@@ -15,10 +15,9 @@ def test_dataset_default_step_size():
         n_steps=32,
         n_instruments=9,
         seq_len=16,
-        trim=False,
+        filter_empty=False,
     )
 
-    assert not dataset.is_trimmed()
     assert len(dataset) == 2
     assert dataset[0].tolist() == dataset.raw_data[0:16].tolist()
     assert dataset[1].tolist() == dataset.raw_data[16:32].tolist()
@@ -30,7 +29,7 @@ def test_dataset_aligned_step_size():
         n_instruments=9,
         seq_len=16,
         step_size=8,
-        trim=False,
+        filter_empty=False,
     )
 
     assert len(dataset) == 3
@@ -45,7 +44,7 @@ def test_dataset_misaligned_step_size():
         n_instruments=9,
         seq_len=16,
         step_size=8,
-        trim=False,
+        filter_empty=False,
     )
     assert len(dataset) == 2
     assert dataset[0].tolist() == dataset.raw_data[0:16].tolist()
@@ -56,7 +55,7 @@ def test_dataset_misaligned_step_size():
         n_instruments=9,
         seq_len=16,
         step_size=8,
-        trim=False,
+        filter_empty=False,
     )
     assert len(dataset) == 3
     assert dataset[0].numpy().tolist() == dataset.raw_data[0:16].tolist()
@@ -68,23 +67,26 @@ def test_trim():
     raw_data = np.concatenate(
         [
             np.zeros((8, 9, 3)),
-            np.ones((16, 9, 3)),
+            np.ones((6, 9, 3)),
+            np.zeros((4, 9, 3)),
+            np.ones((6, 9, 3)),
             np.zeros((8, 9, 3)),
         ],
         axis=0,
     )
     dataset = HOVDataset(
         HOVDatasetConfig(
-            hov_dir="dummy",
+            dir="dummy",
             seq_len=4,
             step_size=2,
-            trim=True,
+            filter_empty=True,
         ),
         data=raw_data,
     )
 
-    # 00000000_11111111_11111111_00000000 --> 0001_11111111_000
-    assert dataset.is_trimmed()
-    assert len(dataset) == 9
+    # 00000000_11111100_00111111_00000000 --> 0001_11101111_000
+    assert len(dataset) == 8
     assert dataset[0].tolist() == raw_data[6:10].tolist()
-    assert dataset[-1].tolist() == raw_data[22:26].tolist()
+    assert dataset[3].tolist() == raw_data[12:16].tolist()
+    assert dataset[4].tolist() == raw_data[16:20].tolist()
+    assert dataset[7].tolist() == raw_data[22:26].tolist()

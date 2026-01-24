@@ -28,16 +28,16 @@ def create_dummy_dataset(
     n_instruments: int,
     seq_len: int,
     step_size: int = None,
-    trim: bool = True,
+    filter_empty: bool = True,
 ) -> HOVDataset:
     data = create_dummy_hov(
         n_steps=n_steps,
         n_instruments=n_instruments,
     )
     config = HOVDatasetConfig(
-        hov_dir="dummy",
+        dir="dummy",
         seq_len=seq_len,
         step_size=step_size,
-        trim=trim,
+        filter_empty=filter_empty,
     )
     return HOVDataset(config, data=data)

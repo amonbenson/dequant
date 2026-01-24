@@ -11,10 +11,10 @@ logger = logging.getLogger("dataset")
 
 @dataclass
 class HOVDatasetConfig:
-    hov_dir: Path
+    dir: Path
     seq_len: int = 128
     step_size: Optional[int] = None
-    trim: bool = True
+    filter_empty: bool = True
 
     def __post_init__(self):
         if self.step_size is None:
@@ -35,18 +35,21 @@ class HOVDataset(Dataset):
             self._data = torch.from_numpy(data)
         else:
             # Load data from the configured directory
-            npz_files = sorted(Path(self.config.hov_dir).glob("*.npz"))
+            npz_files = sorted(Path(self.config.dir).glob("*.npz"))
             if not npz_files:
                 raise FileNotFoundError(
-                    f"No .npz files found in {self.config.hov_dir}. Did you run preprocess?"
+                    f"No .npz files found in {self.config.dir}. Did you run preprocess?"
                 )
 
+            # Load each npz file
             arrays = []
             for filename in npz_files:
-                with np.load(filename) as f:
-                    arrays.append(f)
+                with np.load(filename, allow_pickle=True) as f:
+                    arrays.append(f["data"])
 
+            # Concatenate twice: 1. stich each file together, 2. stich each sequence within each file together
             concatenated = np.concatenate(arrays, axis=0)
+            concatenated = np.concatenate(concatenated, axis=0)
             self._data = torch.from_numpy(concatenated).to(torch.float32)
 
         # Validate the data shape (N, instruments, hov=3)
@@ -60,23 +63,18 @@ class HOVDataset(Dataset):
         unfolded = self._data.unfold(0, self.config.seq_len, self.config.step_size)
         self._chunks = unfolded.movedim(-1, 1)  # move the chunk dimension to the start
 
-        # Trim empty chunks from the start and end
-        if self.config.trim:
-            non_empty = self._chunks.any(dim=(1, 2, 3)).int()
-            start = non_empty.argmax()
-            end = len(non_empty) - non_empty.flip(dims=(0,)).argmax()
+        # Remove completely empty chunks
+        if self.config.filter_empty:
+            non_empty = self._chunks.any(dim=(1, 2, 3))
+            self._chunks = self._chunks[non_empty]
 
-            if start >= end:
-                raise ValueError(
-                    "Cannot trim, because the dataset is completely empty!"
+            n_empty = len(self) - non_empty.sum()
+            if n_empty > 0:
+                logger.info(
+                    f"Removed {n_empty}/{len(self)} training sequences because they are completely empty."
                 )
 
-            self._chunks = self._chunks[start:end]
-            self._trim_start = start.item()
-            self._trim_end = end.item()
-        else:
-            self._trim_start = 0
-            self._trim_end = len(self)
+        logger.info(f"Loaded {len(self)} sequences.")
 
     def __len__(self) -> int:
         return len(self._chunks)
@@ -87,14 +85,3 @@ class HOVDataset(Dataset):
     @property
     def raw_data(self) -> torch.Tensor:
         return self._data
-
-    @property
-    def trim_start(self) -> int:
-        return self._trim_start
-
-    @property
-    def trim_end(self) -> int:
-        return self._trim_end
-
-    def is_trimmed(self) -> bool:
-        return self._trim_start > 0 or self._trim_end < len(self)

@@ -51,7 +51,7 @@ def preprocess_egmd():
     # run preprocessing for each split
     for split_name, df in df_splits.items():
         # Create split directory
-        split_dir = CONFIG.dataset_dir / split_name
+        split_dir = CONFIG.dataset.dir / split_name
         os.makedirs(split_dir, exist_ok=True)
 
         # Skip if the target already exists

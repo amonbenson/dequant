@@ -212,11 +212,11 @@ class HOVConverter:
         data = [item[1] for item in data]
 
         # Pack data into a numpy array
-        data_np = np.empty(len(data), dtype=object)
+        data_list = np.empty(len(data), dtype=list)
         for i, item in enumerate(data):
-            data_np[i] = item
+            data_list[i] = item
 
         elapsed = time.perf_counter() - start
         logger.info(f"Processed {len(file_infos)} MIDI files in {elapsed:.6f} seconds")
 
-        return data_np
+        return data_list

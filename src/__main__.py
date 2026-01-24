@@ -1,6 +1,6 @@
 import logging
 from simple_parsing import ArgumentParser
-from .config import MainConfig, update_config
+from .config import MainConfig, update_config, CONFIG
 from .preprocess import preprocess
 from .train import train
 
@@ -26,6 +26,8 @@ def main():
         case "preprocess":
             preprocess()
         case "train":
+            if CONFIG.train.auto_preprocess:
+                preprocess()
             train()
         case _:
             logger.error(f"Unknown command '{args.command}'")
