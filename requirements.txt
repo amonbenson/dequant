@@ -1,5 +1,8 @@
-ipykernel~=7.1.0
-torch~=2.9.1
-torchaudio~=2.9.1
-numpy~=2.2.6
+torch~=2.10.0
+torchaudio~=2.10.0
+numpy~=2.4.1
 matplotlib~=3.10.8
+tyro~=1.0.5
+tqdm~=4.67.1
+pretty_midi~=0.2.11
+pandas~=3.0.0

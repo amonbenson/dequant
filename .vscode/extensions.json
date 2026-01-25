@@ -1,0 +1,7 @@
+{
+    "recommendations": [
+        "ms-python.python",
+        "fill-labs.dependi",
+        "charliermarsh.ruff"
+    ]
+}
