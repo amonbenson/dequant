@@ -1,7 +1,6 @@
 from pathlib import Path
 from dataclasses import dataclass, field, fields
-from typing import Optional, Literal
-import tyro
+from typing import Optional
 from ..hov.converter import DrumCategory, DEFAULT_DRUM_CATEGORIES
 
 
