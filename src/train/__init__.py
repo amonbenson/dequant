@@ -41,7 +41,7 @@ def create_dataloader(dir: Path):
     dataset = HOVEncoderDecoderDataset(
         HOVDatasetConfig(
             dir=dir,
-            seq_len=CONFIG.model.seq_len,
+            seq_len=CONFIG.model.max_seq_len,
             sample_stride=CONFIG.train.sample_stride,
             filter_empty=True,
         )
@@ -70,14 +70,11 @@ def train():
 
     logger.info(f"Using device '{device}'")
 
-    train_set, test_set, validation_set = [
-        create_dataloader(CONFIG.data.dir / split_name)
-        for split_name in ("train", "test", "validation")
-    ]
+    train_set, test_set, validation_set = [create_dataloader(CONFIG.data.dir / split_name) for split_name in ("train", "test", "validation")]
 
     model = DequantTransformer(
         DequantTransformerConfig(
-            max_seq_len=CONFIG.model.seq_len,
+            max_seq_len=CONFIG.model.max_seq_len,
             num_instruments=CONFIG.model.drums.num_instruments,
             d_model=CONFIG.model.transformer.d_model,
         )

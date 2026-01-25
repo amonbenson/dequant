@@ -32,13 +32,9 @@ class HOVConverterConfig:
         for i, cat in enumerate(self.categories):
             for pitch in cat.pitches:
                 if pitch < 0 or pitch > 127:
-                    raise ValueError(
-                        f"Category {cat.label}: pitch {pitch} is out of range."
-                    )
+                    raise ValueError(f"Category {cat.label}: pitch {pitch} is out of range.")
                 if self._category_lookup[pitch] != -1:
-                    raise ValueError(
-                        f"Category: {cat.label}: pitch {pitch} was already mapped to another category. Category pitches must be unique!"
-                    )
+                    raise ValueError(f"Category: {cat.label}: pitch {pitch} was already mapped to another category. Category pitches must be unique!")
                 self._category_lookup[pitch] = i
 
 
@@ -84,9 +80,7 @@ class HOVConverter:
 
         # Cache repeated calculations (optimization #6)
         bps = tempo_bpm / 60.0  # beats per second
-        steps_per_bar = (
-            self.config.resolution * 4
-        )  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
+        steps_per_bar = self.config.resolution * 4  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
         steps_ps = bps * self.config.resolution  # steps per second
         step = 1.0 / steps_ps
 
@@ -101,9 +95,7 @@ class HOVConverter:
             n_grid_onsets += steps_per_bar - n_grid_onsets % steps_per_bar
 
         # snap to grid
-        nearest_idc = np.rint(onsets * steps_ps).astype(
-            np.int32
-        )  # get snapped onsets as grid indices
+        nearest_idc = np.rint(onsets * steps_ps).astype(np.int32)  # get snapped onsets as grid indices
         nearest = nearest_idc * step  # snapped values
 
         offsets = onsets - nearest  # timing derivations ('feel')
@@ -119,9 +111,7 @@ class HOVConverter:
             composite_keys = np.column_stack((pitch_rows, nearest_idc))
 
             # Find unique positions and indices
-            unique_positions, inverse_indices = np.unique(
-                composite_keys, axis=0, return_inverse=True
-            )
+            unique_positions, inverse_indices = np.unique(composite_keys, axis=0, return_inverse=True)
 
             # For each unique position, find the note with maximum velocity
             selected_indices = []
@@ -131,9 +121,7 @@ class HOVConverter:
                 duplicate_indices = np.where(duplicate_mask)[0]
 
                 # Select the one with highest velocity
-                max_vel_idx = duplicate_indices[
-                    np.argmax(velocities[duplicate_indices])
-                ]
+                max_vel_idx = duplicate_indices[np.argmax(velocities[duplicate_indices])]
                 selected_indices.append(max_vel_idx)
 
             selected_indices = np.array(selected_indices)
@@ -146,9 +134,7 @@ class HOVConverter:
 
         # Pre-allocate grids (optimization #4)
         # Note: onsets also use float32, because torch uses float32 internally
-        onset_grid = np.zeros(
-            (n_grid_onsets, len(self.config.categories)), dtype=np.float32
-        )
+        onset_grid = np.zeros((n_grid_onsets, len(self.config.categories)), dtype=np.float32)
         offset_grid = np.zeros_like(onset_grid)
         vel_grid = np.zeros_like(onset_grid)
 
@@ -190,10 +176,7 @@ class HOVConverter:
         # Use ProcessPoolExecutor for better Jupyter compatibility
         with ProcessPoolExecutor(max_workers=n_workers) as executor:
             # Submit all tasks
-            futures = {
-                executor.submit(HOVConverter.midi_to_hov, self, filepath, bpm): i
-                for i, (filepath, bpm) in enumerate(file_infos)
-            }
+            futures = {executor.submit(HOVConverter.midi_to_hov, self, filepath, bpm): i for i, (filepath, bpm) in enumerate(file_infos)}
 
             # Process results as they complete with progress bar
             for future in tqdm(as_completed(futures), total=len(futures)):

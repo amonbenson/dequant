@@ -47,9 +47,7 @@ class Decoder(nn.Module):
         q, k, v = qkv.chunk(3, dim=-1)
 
         attn: torch.Tensor = (q @ k.transpose(-2, -1)) / np.sqrt(self.config.d_model)
-        causal_mask = torch.triu(
-            torch.ones(seq_len, seq_len, device=x.device), diagonal=1
-        ).bool()
+        causal_mask = torch.triu(torch.ones(seq_len, seq_len, device=x.device), diagonal=1).bool()
         attn = attn.masked_fill(causal_mask, float("-inf"))
         attn = torch.softmax(attn, dim=-1)
 

@@ -9,9 +9,7 @@ logger = logging.getLogger("download")
 
 def download_file(url: str, filename: Path):
     if filename.exists():
-        logger.info(
-            f"Skipping download, because the target directory '{filename}' already exists."
-        )
+        logger.info(f"Skipping download, because the target directory '{filename}' already exists.")
         return
 
     # Show a nice progress bar
@@ -34,9 +32,7 @@ def download_file(url: str, filename: Path):
 
 def unzip_file(zip_filename: Path, target_dir: Path):
     if target_dir.exists():
-        logger.info(
-            f"Skipping unzip, because the target directory '{target_dir}' already exists."
-        )
+        logger.info(f"Skipping unzip, because the target directory '{target_dir}' already exists.")
         return
 
     with ZipFile(zip_filename) as f:

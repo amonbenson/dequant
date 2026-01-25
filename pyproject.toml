@@ -16,5 +16,4 @@ addopts = ["--capture=no"]  # Always print test output
 [tool.ruff]
 preview = true
 exclude = ["notebooks/"]
-
-[tool.ruff.format]
+line-length = 180

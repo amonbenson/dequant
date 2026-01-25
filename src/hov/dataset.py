@@ -34,9 +34,7 @@ class HOVDataset(Dataset):
             # Load data from the configured directory
             npz_files = sorted(Path(self.config.dir).glob("*.npz"))
             if not npz_files:
-                raise FileNotFoundError(
-                    f"No .npz files found in {self.config.dir}. Did you run preprocess?"
-                )
+                raise FileNotFoundError(f"No .npz files found in {self.config.dir}. Did you run preprocess?")
 
             # Load each npz file
             arrays = []
@@ -51,18 +49,12 @@ class HOVDataset(Dataset):
 
         # Validate the data shape (N, instruments, hov=3)
         assert len(self._data.shape) == 3
-        assert self._data.shape[0] >= self.config.seq_len, (
-            f"Not enough data to generate sequences of length {self.config.seq_len}"
-        )
+        assert self._data.shape[0] >= self.config.seq_len, f"Not enough data to generate sequences of length {self.config.seq_len}"
         assert self._data.shape[2] == 3, "Expected HOV dimension to be of size 3"
 
         # Unfold the data into separate chunks
-        expected_num_sequences = (
-            len(self._data) - self.config.seq_len
-        ) // self.config.sample_stride + 1
-        logger.info(
-            f"Unfolding raw data of length {len(self._data)} into {expected_num_sequences} sequences ..."
-        )
+        expected_num_sequences = (len(self._data) - self.config.seq_len) // self.config.sample_stride + 1
+        logger.info(f"Unfolding raw data of length {len(self._data)} into {expected_num_sequences} sequences ...")
 
         unfolded = self._data.unfold(0, self.config.seq_len, self.config.sample_stride)
         self._chunks = unfolded.movedim(-1, 1)  # move the chunk dimension to the start
@@ -75,9 +67,7 @@ class HOVDataset(Dataset):
 
             n_empty = len(self) - non_empty.sum()
             if n_empty > 0:
-                logger.info(
-                    f"Removed {n_empty}/{len(self)} training sequences because they are completely empty."
-                )
+                logger.info(f"Removed {n_empty}/{len(self)} training sequences because they are completely empty.")
 
         logger.info(f"Loaded {len(self)} sequences.")
 

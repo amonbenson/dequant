@@ -34,16 +34,12 @@ def test_dequant_overfitting():
     )
 
     # Create model and a basic optimizer
-    model = DequantTransformer(
-        DequantTransformerConfig(max_seq_len=4, num_instruments=2, d_model=128)
-    )
+    model = DequantTransformer(DequantTransformerConfig(max_seq_len=4, num_instruments=2, d_model=128))
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 
     for epoch in range(300):
-        for _batch_idx, (encoder_input, decoder_input, decoder_target) in enumerate(
-            train_loader
-        ):
+        for _batch_idx, (encoder_input, decoder_input, decoder_target) in enumerate(train_loader):
             output: torch.Tensor = model(encoder_input, decoder_input)
             loss = criterion(output, decoder_target)
 

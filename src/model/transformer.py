@@ -42,41 +42,21 @@ class DequantTransformer(nn.Module):
         decoder_input: torch.Tensor,
     ) -> torch.Tensor:
         # Validate inputs
-        assert encoder_input.dtype == torch.float32, (
-            f"encoder_input must be float32, not {encoder_input.dtype}"
-        )
-        assert decoder_input.dtype == torch.float32, (
-            f"decoder_input must be float32, not {encoder_input.dtype}"
-        )
+        assert encoder_input.dtype == torch.float32, f"encoder_input must be float32, not {encoder_input.dtype}"
+        assert decoder_input.dtype == torch.float32, f"decoder_input must be float32, not {encoder_input.dtype}"
 
-        assert len(encoder_input.shape) == 4, (
-            f"Expected encoder_input to be of shape (batch_size, seq_len, num_instruments, 1), but got shape ({encoder_input.shape})"
-        )
-        assert len(decoder_input.shape) == 4, (
-            f"Expected decoder_input to be of shape (batch_size, seq_len, num_instruments, 2), but got shape ({decoder_input.shape})"
-        )
+        assert len(encoder_input.shape) == 4, f"Expected encoder_input to be of shape (batch_size, seq_len, num_instruments, 1), but got shape ({encoder_input.shape})"
+        assert len(decoder_input.shape) == 4, f"Expected decoder_input to be of shape (batch_size, seq_len, num_instruments, 2), but got shape ({decoder_input.shape})"
 
-        assert encoder_input.shape[0] == decoder_input.shape[0], (
-            f"batch_size mismatch: {encoder_input.shape[0]} (encoder_input) != {decoder_input.shape[0]} (decoder_input)"
-        )
-        assert encoder_input.shape[1] == decoder_input.shape[1], (
-            f"seq_len mismatch: {encoder_input.shape[1]} (encoder_input) != {decoder_input.shape[1]} (decoder_input)"
-        )
-        assert encoder_input.shape[2] == decoder_input.shape[2], (
-            f"n_instruments mismatch: {encoder_input.shape[2]} (encoder_input) != {decoder_input.shape[2]} (decoder_input)"
-        )
-        assert encoder_input.shape[3] == 1, (
-            f"expected encoder_input HOV dimension to only include hits (size 1), but was {encoder_input.shape[3]}"
-        )
-        assert decoder_input.shape[3] == 2, (
-            f"expected decoder_input HOV dimension to only include offsets + velocities (size 2), but was {decoder_input.shape[3]}"
-        )
+        assert encoder_input.shape[0] == decoder_input.shape[0], f"batch_size mismatch: {encoder_input.shape[0]} (encoder_input) != {decoder_input.shape[0]} (decoder_input)"
+        assert encoder_input.shape[1] == decoder_input.shape[1], f"seq_len mismatch: {encoder_input.shape[1]} (encoder_input) != {decoder_input.shape[1]} (decoder_input)"
+        assert encoder_input.shape[2] == decoder_input.shape[2], f"n_instruments mismatch: {encoder_input.shape[2]} (encoder_input) != {decoder_input.shape[2]} (decoder_input)"
+        assert encoder_input.shape[3] == 1, f"expected encoder_input HOV dimension to only include hits (size 1), but was {encoder_input.shape[3]}"
+        assert decoder_input.shape[3] == 2, f"expected decoder_input HOV dimension to only include offsets + velocities (size 2), but was {decoder_input.shape[3]}"
 
         batch_size, seq_len, num_instruments, _ = encoder_input.shape
         assert seq_len <= self.config.max_seq_len, "max_seq_len exceeded."
-        assert num_instruments == self.config.num_instruments, (
-            f"received num_instruments ({num_instruments}) is different from the configuration ({self.config.num_instruments})"
-        )
+        assert num_instruments == self.config.num_instruments, f"received num_instruments ({num_instruments}) is different from the configuration ({self.config.num_instruments})"
 
         # Flatten instrument dimension
         encoder_flat = encoder_input.flatten(start_dim=2)

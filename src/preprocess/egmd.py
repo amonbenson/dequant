@@ -57,9 +57,7 @@ def preprocess_egmd():
         # Skip if the target already exists
         data_filename = split_dir / "egmd.npz"
         if data_filename.exists():
-            logger.info(
-                f"Skipping preprocessing, because the target file '{data_filename}' already exists."
-            )
+            logger.info(f"Skipping preprocessing, because the target file '{data_filename}' already exists.")
             continue
 
         # Convert df entries to file info list

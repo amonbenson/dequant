@@ -38,9 +38,7 @@ def create_hov(midi: PrettyMIDI, tempo_bpm, config: HOVConverterConfig) -> np.nd
 
 def test_single_kick():
     sequence = create_midi([DrumHit(0.0, 36)])
-    hov = create_hov(
-        sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES)
-    )
+    hov = create_hov(sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
 
     # pattern should get extended to 16 steps, with 3 instruments each
     assert hov.shape == (16, 3, 3)
@@ -81,9 +79,7 @@ def test_hits():
         DrumHit(12 / 8, 42),  # Hi-Hat
         DrumHit(14 / 8, 42),  # Hi-Hat
     ])
-    hov = create_hov(
-        sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES)
-    )
+    hov = create_hov(sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
 
     # Should still be 16 steps
     assert hov.shape == (16, 3, 3)
@@ -103,9 +99,7 @@ def test_offsets():
         DrumHit(10.8 / 8, 36),
         DrumHit(13 / 8, 36),
     ])
-    hov = create_hov(
-        sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES)
-    )
+    hov = create_hov(sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
 
     # Check hit positions and corresponding offsets
     # fmt: off
@@ -126,9 +120,7 @@ def test_velocities():
         DrumHit(10 / 8, 36, 100),  # Kick
         DrumHit(10 / 8, 35, 64),  # Kick
     ])
-    hov = create_hov(
-        sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES)
-    )
+    hov = create_hov(sequence, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
 
     # Check velocities for each instrument
     # fmt: off
