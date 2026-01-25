@@ -3,7 +3,10 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 from ..hov.dataset import HOVEncoderDecoderDataset, HOVDatasetConfig
-from ..model import Dequant as Dequant, DequantConfig as DequantConfig
+from ..model import (
+    DequantTransformer as DequantTransformer,
+    DequantTransformerConfig as DequantTransformerConfig,
+)
 from ..config import CONFIG
 
 logger = logging.getLogger("train")
@@ -72,8 +75,8 @@ def train():
         for split_name in ("train", "test", "validation")
     ]
 
-    model = Dequant(
-        DequantConfig(
+    model = DequantTransformer(
+        DequantTransformerConfig(
             max_seq_len=CONFIG.model.seq_len,
             num_instruments=CONFIG.model.drums.num_instruments,
             d_model=CONFIG.model.transformer.d_model,

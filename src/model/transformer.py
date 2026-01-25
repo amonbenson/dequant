@@ -6,14 +6,14 @@ from .decoder import Decoder, DecoderConfig
 
 
 @dataclass
-class DequantConfig:
+class DequantTransformerConfig:
     max_seq_len: int = 128
     num_instruments: int = 9
     d_model: int = 128
 
 
-class Dequant(nn.Module):
-    def __init__(self, config: DequantConfig):
+class DequantTransformer(nn.Module):
+    def __init__(self, config: DequantTransformerConfig):
         super().__init__()
         self.config = config
 

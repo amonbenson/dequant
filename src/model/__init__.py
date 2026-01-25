@@ -1,10 +1,10 @@
 from .encoder import Encoder
 from .decoder import Decoder
-from .dequant import Dequant, DequantConfig
+from .transformer import DequantTransformer, DequantTransformerConfig
 
 __all__ = [
     "Encoder",
     "Decoder",
-    "Dequant",
-    "DequantConfig",
+    "DequantTransformer",
+    "DequantTransformerConfig",
 ]

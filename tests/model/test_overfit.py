@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from src.model import Dequant, DequantConfig
+from src.model import DequantTransformer, DequantTransformerConfig
 from src.hov import HOVEncoderDecoderDataset, HOVDatasetConfig
 
 
@@ -34,7 +34,9 @@ def test_dequant_overfitting():
     )
 
     # Create model and a basic optimizer
-    model = Dequant(DequantConfig(max_seq_len=4, num_instruments=2, d_model=128))
+    model = DequantTransformer(
+        DequantTransformerConfig(max_seq_len=4, num_instruments=2, d_model=128)
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 
