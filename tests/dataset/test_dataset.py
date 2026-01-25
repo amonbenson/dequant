@@ -1,5 +1,5 @@
 import numpy as np
-from src.hov.dataset import HOVDataset, HOVDatasetConfig
+from src.hov.dataset import HOVDataset, HOVEncoderDecoderDataset, HOVDatasetConfig
 from tests.utils import create_dummy_hov, create_dummy_dataset
 
 
@@ -90,3 +90,35 @@ def test_trim():
     assert dataset[3].tolist() == raw_data[12:16].tolist()
     assert dataset[4].tolist() == raw_data[16:20].tolist()
     assert dataset[7].tolist() == raw_data[22:26].tolist()
+
+
+def test_encoder_decoder():
+    raw_data = create_dummy_hov(
+        n_steps=32,
+        n_instruments=9,
+    )
+    dataset = HOVEncoderDecoderDataset(
+        HOVDatasetConfig(
+            dir="dummy",
+            seq_len=16,
+            step_size=8,
+            filter_empty=False,
+        ),
+        data=raw_data,
+    )
+
+    # Note: only 2 full sequences should fit here, because the encoder/decoder requires one more step for the shifting
+    # (and we are only supplying 32 steps, not 33)
+    assert len(dataset) == 2
+
+    # Check timestep 0
+    encoder_input, decoder_input, decoder_target = dataset[0]
+    assert encoder_input.tolist() == raw_data[1:17, :, 0:1].tolist()
+    assert decoder_input.tolist() == raw_data[0:16, :, 1:3].tolist()
+    assert decoder_target.tolist() == raw_data[1:17, :, 1:3].tolist()
+
+    # Check timestep 1
+    encoder_input, decoder_input, decoder_target = dataset[1]
+    assert encoder_input.tolist() == raw_data[9:25, :, 0:1].tolist()
+    assert decoder_input.tolist() == raw_data[8:24, :, 1:3].tolist()
+    assert decoder_target.tolist() == raw_data[9:25, :, 1:3].tolist()

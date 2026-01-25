@@ -7,14 +7,15 @@ from ..hov.converter import DrumCategory, DEFAULT_DRUM_CATEGORIES
 @dataclass
 class DatasetConfig:
     dir: Path = Path(".data/dataset")
-    step_size: Optional[int] = None
+    step_size: Optional[int] = 77777  # 7
 
 
 @dataclass
 class ModelConfig:
     seq_len: int = 128
-    instruments: int = 7
-    resolution: int = 16
+    d_model: int = 128
+    n_instruments: int = 9
+    resolution: int = 4
     categories: list[DrumCategory] = field(
         init=False,
         default_factory=lambda: DEFAULT_DRUM_CATEGORIES,
@@ -36,7 +37,12 @@ class PreprocessConfig:
 @dataclass
 class TrainConfig:
     auto_preprocess: bool = True
-    step_size: Optional[int] = None
+
+    batch_size: int = 32
+    shuffle: bool = True
+    learning_rate: float = 1e-4
+    num_epochs: int = 100
+    device: Optional[str] = None
 
 
 @dataclass

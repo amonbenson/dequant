@@ -8,7 +8,10 @@ from .decoder import Decoder, DecoderConfig
 @dataclass
 class DequantConfig:
     max_seq_len: int = 128
-    num_instruments: int = 7
+    num_instruments: int = 9
+    d_model: int = 128
+    n_heads: int = 4
+    n_layers: int = 4
 
 
 class Dequant(nn.Module):
@@ -16,49 +19,80 @@ class Dequant(nn.Module):
         super().__init__()
         self.config = config
 
-        # HOV representation requires 3 values per instrument
-        d_encoder = config.num_instruments  # only hits
-        d_decoder = config.num_instruments * 2  # offsets + velocities per instrument
+        # Encoder receives only hits, while decoder receives offsets + velocities
+        d_encoder_input = config.num_instruments * 1
+        d_decoder_input = config.num_instruments * 2
+        d_model = config.d_model
+
+        # Input projections
+        self.encoder_input_proj = nn.Linear(d_encoder_input, d_model)
+        self.decoder_input_proj = nn.Linear(d_decoder_input, d_model)
 
         # Encoder and decoder blocks
-        self.encoder = Encoder(EncoderConfig(d_model=d_encoder))
-        self.decoder = Decoder(DecoderConfig(d_model=d_decoder, d_cross=d_encoder))
+        self.encoder = Encoder(EncoderConfig(d_model=d_model))
+        self.decoder = Decoder(DecoderConfig(d_model=d_model))
 
         # Output projection
-        self.output_proj = nn.Linear(d_decoder, d_decoder)
+        self.output_proj = nn.Linear(d_model, d_decoder_input)
+
         self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
 
     def forward(
-        self, encoder_input: torch.Tensor, decoder_input: torch.Tensor
+        self,
+        encoder_input: torch.Tensor,
+        decoder_input: torch.Tensor,
     ) -> torch.Tensor:
-        batch_size, seq_len, num_instruments = encoder_input.shape
+        # Validate inputs
+        assert encoder_input.dtype == torch.float32, (
+            f"encoder_input must be float32, not {encoder_input.dtype}"
+        )
+        assert decoder_input.dtype == torch.float32, (
+            f"decoder_input must be float32, not {encoder_input.dtype}"
+        )
 
+        assert len(encoder_input.shape) == 4, (
+            f"Expected encoder_input to be of shape (batch_size, seq_len, n_instruments, 1), but got shape ({encoder_input.shape})"
+        )
+        assert len(decoder_input.shape) == 4, (
+            f"Expected decoder_input to be of shape (batch_size, seq_len, n_instruments, 2), but got shape ({decoder_input.shape})"
+        )
+
+        assert encoder_input.shape[0] == decoder_input.shape[0], (
+            f"batch_size mismatch: {encoder_input.shape[0]} (encoder_input) != {decoder_input.shape[0]} (decoder_input)"
+        )
+        assert encoder_input.shape[1] == decoder_input.shape[1], (
+            f"seq_len mismatch: {encoder_input.shape[1]} (encoder_input) != {decoder_input.shape[1]} (decoder_input)"
+        )
+        assert encoder_input.shape[2] == decoder_input.shape[2], (
+            f"n_instruments mismatch: {encoder_input.shape[2]} (encoder_input) != {decoder_input.shape[2]} (decoder_input)"
+        )
+        assert encoder_input.shape[3] == 1, (
+            f"expected encoder_input HOV dimension to only include hits (size 1), but was {encoder_input.shape[3]}"
+        )
+        assert decoder_input.shape[3] == 2, (
+            f"expected decoder_input HOV dimension to only include offsets + velocities (size 2), but was {decoder_input.shape[3]}"
+        )
+
+        batch_size, seq_len, num_instruments, _ = encoder_input.shape
         assert seq_len <= self.config.max_seq_len, "max_seq_len exceeded."
-        assert num_instruments == self.config.num_instruments
+        assert num_instruments == self.config.num_instruments, (
+            f"received n_instruments ({num_instruments}) is different from the configuration ({self.config.num_instruments})"
+        )
 
-        assert decoder_input.shape[0] == encoder_input.shape[0], (
-            "inconsistent batch size"
-        )
-        assert decoder_input.shape[1] == encoder_input.shape[1], (
-            "inconsistent sequence length"
-        )
-        assert decoder_input.shape[2] == encoder_input.shape[2], (
-            "inconsistent number of instruments"
-        )
-        assert decoder_input.shape[3] == 2, "decoder input must have OV representations"
-
-        # Flatten to d_model dimension
+        # Flatten instrument dimension
         encoder_flat = encoder_input.flatten(start_dim=2)
         decoder_flat = decoder_input.flatten(start_dim=2)
 
-        # Encode the input sequence
-        encoder_output: torch.Tensor = self.encoder(encoder_flat)
+        # Project to model dimension
+        encoder_emb = self.encoder_input_proj(encoder_flat)
+        decoder_emb = self.decoder_input_proj(decoder_flat)
 
-        # Decode with cross-attention to encoder
-        y: torch.Tensor = self.decoder(decoder_flat, encoder_output)
+        # Transformer formward pass
+        encoder_output: torch.Tensor = self.encoder(encoder_emb)
+        y: torch.Tensor = self.decoder(decoder_emb, encoder_output)
 
-        # Project and reshape
+        # Project back to output dimension
         y = self.output_proj(y)
         y = y.reshape(batch_size, seq_len, num_instruments, 2)
 

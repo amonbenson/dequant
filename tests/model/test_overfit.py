@@ -1,67 +1,58 @@
+import numpy as np
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 from src.model import Dequant, DequantConfig
+from src.hov import HOVEncoderDecoderDataset, HOVDatasetConfig
 
 
 def test_dequant_overfitting():
-    # Dataset shape: (batch, seq_len, instrument, hov=3)
-    dataset_input = torch.tensor([
-        [
-            [[1.0, 0.0, 1.0], [0.0, 0.0, 0.0]],
-            [[0.0, 0.0, 0.0], [1.0, 0.0, 1.0]],
-            [[1.0, 0.0, 1.0], [1.0, 0.0, 1.0]],
-            [[0.0, 0.0, 0.0], [1.0, 0.0, 1.0]],
-        ],
-        [
-            [[1.0, 0.0, 1.0], [1.0, 0.0, 1.0]],
-            [[0.0, 0.0, 0.0], [1.0, 0.0, 1.0]],
-            [[1.0, 0.0, 1.0], [0.0, 0.0, 0.0]],
-            [[0.0, 0.0, 0.0], [1.0, 0.0, 1.0]],
-        ],
-    ])
-    dataset_target = torch.tensor([
-        [
-            [[1.0, 0.1, 0.9], [0.0, 0.0, 0.0]],
-            [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
-            [[1.0, -0.1, 0.9], [1.0, -0.1, 0.9]],
-            [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
-        ],
-        [
-            [[1.0, -0.1, 0.9], [1.0, -0.1, 0.9]],
-            [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
-            [[1.0, 0.1, 0.9], [0.0, 0.0, 0.0]],
-            [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
-        ],
-    ])
-
-    # Dissect the overfitting dataset into model input and target
-    encoder_input = dataset_input[..., 0]  # use hits only
-    decoder_input = torch.cat(
-        [
-            torch.zeros(2, 1, 2, 2),  # Start token
-            dataset_target[:, :-1, :, 1:],  # Shift right along the seq_len dimension
-        ],
-        dim=1,
+    dataset = HOVEncoderDecoderDataset(
+        HOVDatasetConfig(
+            dir="dummy",
+            seq_len=4,
+            step_size=1,
+        ),
+        data=np.array(
+            [
+                [[1.0, 0.1, 0.9], [0.0, 0.0, 0.0]],
+                [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
+                [[1.0, -0.1, 0.9], [0.0, -0.1, 0.9]],
+                [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
+                [[1.0, -0.1, 0.9], [0.0, -0.1, 0.9]],
+                [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
+                [[1.0, 0.1, 0.9], [0.0, 0.0, 0.0]],
+                [[0.0, 0.0, 0.0], [1.0, 0.1, 0.5]],
+            ],
+            dtype=np.float32,
+        ),
     )
-    decoder_target = dataset_target[..., 1:]
+    train_loader = DataLoader(
+        dataset,
+        batch_size=1,
+        shuffle=False,
+    )
 
     # Create model and a basic optimizer
-    model = Dequant(DequantConfig(max_seq_len=4, num_instruments=2))
+    model = Dequant(DequantConfig(max_seq_len=4, num_instruments=2, d_model=128))
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 
-    for epoch in range(1000):
-        output: torch.Tensor = model(encoder_input, decoder_input)
-        loss = criterion(output, decoder_target)
+    for epoch in range(300):
+        for _batch_idx, (encoder_input, decoder_input, decoder_target) in enumerate(
+            train_loader
+        ):
+            output: torch.Tensor = model(encoder_input, decoder_input)
+            loss = criterion(output, decoder_target)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         if epoch % 100 == 0:
             print(f"Epoch {epoch}, Loss: {loss.item():.6f}")
 
-    # Run evaluation on the first dataset sample
+    # Run evaluation on the training dataset
     # Normally, this is a no-no, but because we are intentionally overfitting,
     # we can use the same dataset for training and evaluation
     with torch.no_grad():
