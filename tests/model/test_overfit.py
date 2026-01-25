@@ -11,7 +11,7 @@ def test_dequant_overfitting():
         HOVDatasetConfig(
             dir="dummy",
             seq_len=4,
-            step_size=1,
+            sample_stride=1,
         ),
         data=np.array(
             [

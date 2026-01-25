@@ -10,8 +10,6 @@ class DequantConfig:
     max_seq_len: int = 128
     num_instruments: int = 9
     d_model: int = 128
-    n_heads: int = 4
-    n_layers: int = 4
 
 
 class Dequant(nn.Module):
@@ -52,10 +50,10 @@ class Dequant(nn.Module):
         )
 
         assert len(encoder_input.shape) == 4, (
-            f"Expected encoder_input to be of shape (batch_size, seq_len, n_instruments, 1), but got shape ({encoder_input.shape})"
+            f"Expected encoder_input to be of shape (batch_size, seq_len, num_instruments, 1), but got shape ({encoder_input.shape})"
         )
         assert len(decoder_input.shape) == 4, (
-            f"Expected decoder_input to be of shape (batch_size, seq_len, n_instruments, 2), but got shape ({decoder_input.shape})"
+            f"Expected decoder_input to be of shape (batch_size, seq_len, num_instruments, 2), but got shape ({decoder_input.shape})"
         )
 
         assert encoder_input.shape[0] == decoder_input.shape[0], (
@@ -77,7 +75,7 @@ class Dequant(nn.Module):
         batch_size, seq_len, num_instruments, _ = encoder_input.shape
         assert seq_len <= self.config.max_seq_len, "max_seq_len exceeded."
         assert num_instruments == self.config.num_instruments, (
-            f"received n_instruments ({num_instruments}) is different from the configuration ({self.config.num_instruments})"
+            f"received num_instruments ({num_instruments}) is different from the configuration ({self.config.num_instruments})"
         )
 
         # Flatten instrument dimension

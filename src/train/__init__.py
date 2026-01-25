@@ -1,6 +1,4 @@
 import logging
-from typing import Optional
-from dataclasses import dataclass
 from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
@@ -41,14 +39,14 @@ def create_dataloader(dir: Path):
         HOVDatasetConfig(
             dir=dir,
             seq_len=CONFIG.model.seq_len,
-            step_size=CONFIG.dataset.step_size,
+            sample_stride=CONFIG.train.sample_stride,
             filter_empty=True,
         )
     )
     dataloader = DataLoader(
         dataset,
         batch_size=CONFIG.train.batch_size,
-        shuffle=CONFIG.train.shuffle,
+        shuffle=CONFIG.train.sample_shuffle,
     )
     return dataloader
 
@@ -70,15 +68,15 @@ def train():
     logger.info(f"Using device '{device}'")
 
     train_set, test_set, validation_set = [
-        create_dataloader(CONFIG.dataset.dir / split_name)
+        create_dataloader(CONFIG.data.dir / split_name)
         for split_name in ("train", "test", "validation")
     ]
 
     model = Dequant(
         DequantConfig(
             max_seq_len=CONFIG.model.seq_len,
-            num_instruments=CONFIG.model.n_instruments,
-            d_model=CONFIG.model.d_model,
+            num_instruments=CONFIG.model.drums.num_instruments,
+            d_model=CONFIG.model.transformer.d_model,
         )
     )
     model = model.to(device)

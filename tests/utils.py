@@ -3,13 +3,13 @@ from src.hov.dataset import HOVDataset, HOVDatasetConfig
 
 
 def create_dummy_hov(
-    n_steps: int,
-    n_instruments: int,
+    num_steps: int,
+    num_instruments: int,
     *,
     seed: int = 24601,
     hit_probability: float = 0.9,
 ) -> np.ndarray:
-    shape = (n_steps, n_instruments)
+    shape = (num_steps, num_instruments)
 
     # Instantiate a new random number generator
     rng = np.random.default_rng(seed)
@@ -24,20 +24,20 @@ def create_dummy_hov(
 
 
 def create_dummy_dataset(
-    n_steps: int,
-    n_instruments: int,
+    num_steps: int,
+    num_instruments: int,
     seq_len: int,
-    step_size: int = None,
+    sample_stride: int = 1,
     filter_empty: bool = True,
 ) -> HOVDataset:
     data = create_dummy_hov(
-        n_steps=n_steps,
-        n_instruments=n_instruments,
+        num_steps=num_steps,
+        num_instruments=num_instruments,
     )
     config = HOVDatasetConfig(
         dir="dummy",
         seq_len=seq_len,
-        step_size=step_size,
+        sample_stride=sample_stride,
         filter_empty=filter_empty,
     )
     return HOVDataset(config, data=data)

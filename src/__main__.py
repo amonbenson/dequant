@@ -1,6 +1,6 @@
 import logging
 from simple_parsing import ArgumentParser
-from .config import MainConfig, update_config, CONFIG
+from .config import RootConfig, update_config, CONFIG
 from .preprocess import preprocess
 from .train import train
 
@@ -15,7 +15,7 @@ def main():
     command.add_parser("preprocess")
     command.add_parser("train")
 
-    parser.add_arguments(MainConfig, dest="config")
+    parser.add_arguments(RootConfig, dest="config")
     args = parser.parse_args()
 
     # Apply the command line configuration
@@ -26,9 +26,9 @@ def main():
         case "preprocess":
             preprocess()
         case "train":
-            if CONFIG.dataset.step_size % CONFIG.model.resolution == 0:
+            if CONFIG.train.sample_stride % CONFIG.model.drums.steps_per_beat == 0:
                 logger.warning(
-                    f"The parameter dataset.step_size ({CONFIG.dataset.step_size}) is equally divisible by model.resolution ({CONFIG.model.resolution}). "
+                    f"The parameter data.sample_stride ({CONFIG.data.sample_stride}) is equally divisible by model.drums.steps_per_beat ({CONFIG.model.drums.steps_per_beat}). "
                     + "This will result in poor model performance, because the model will never receive sequences starting at any other beat than 0."
                 )
 

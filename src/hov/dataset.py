@@ -13,15 +13,12 @@ logger = logging.getLogger("dataset")
 class HOVDatasetConfig:
     dir: Path
     seq_len: int = 128
-    step_size: Optional[int] = None
+    sample_stride: int = 1
     filter_empty: bool = True
 
     def __post_init__(self):
-        if self.step_size is None:
-            self.step_size = self.seq_len
-
-        if self.step_size <= 0:
-            raise ValueError("step_size must be > 0")
+        if self.sample_stride <= 0:
+            raise ValueError("sample_stride must be > 0")
         if self.seq_len <= 0:
             raise ValueError("seq_len must be > 0")
 
@@ -62,12 +59,12 @@ class HOVDataset(Dataset):
         # Unfold the data into separate chunks
         expected_num_sequences = (
             len(self._data) - self.config.seq_len
-        ) // self.config.step_size + 1
+        ) // self.config.sample_stride + 1
         logger.info(
             f"Unfolding raw data of length {len(self._data)} into {expected_num_sequences} sequences ..."
         )
 
-        unfolded = self._data.unfold(0, self.config.seq_len, self.config.step_size)
+        unfolded = self._data.unfold(0, self.config.seq_len, self.config.sample_stride)
         self._chunks = unfolded.movedim(-1, 1)  # move the chunk dimension to the start
 
         # Remove completely empty chunks
@@ -108,7 +105,7 @@ class HOVEncoderDecoderDataset(HOVDataset):
             HOVDatasetConfig(
                 dir=config.dir,
                 seq_len=config.seq_len + 1,
-                step_size=config.step_size,
+                sample_stride=config.sample_stride,
                 filter_empty=config.filter_empty,
             ),
             data=data,

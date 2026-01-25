@@ -12,21 +12,21 @@ logger = logging.getLogger("egmd")
 def preprocess_egmd():
     converter = HOVConverter(
         HOVConverterConfig(
-            resolution=CONFIG.model.resolution,
-            categories=CONFIG.model.categories,
+            resolution=CONFIG.model.drums.steps_per_beat,
+            categories=CONFIG.model.drums.categories,
         )
     )
 
-    midi_filename = CONFIG.tmp_dir / "egmd-midi.zip"
-    meta_filename = CONFIG.tmp_dir / "egmd-meta.csv"
+    midi_filename = CONFIG.data.cache_dir / "egmd-midi.zip"
+    meta_filename = CONFIG.data.cache_dir / "egmd-meta.csv"
 
     # Create tmp directory for downloading files
-    os.makedirs(CONFIG.tmp_dir, exist_ok=True)
+    os.makedirs(CONFIG.data.cache_dir, exist_ok=True)
 
     # Download midi and meta data
-    logger.info(f"Downloading to '{CONFIG.tmp_dir}' ...")
-    download_file(CONFIG.preprocess.egmd.midi_url, midi_filename)
-    download_file(CONFIG.preprocess.egmd.meta_url, meta_filename)
+    logger.info(f"Downloading to '{CONFIG.data.cache_dir}' ...")
+    download_file(CONFIG.data.egmd.midi_url, midi_filename)
+    download_file(CONFIG.data.egmd.metadata_url, meta_filename)
 
     # Unzip midi dataset
     logger.info("Unzipping midi files...")
@@ -51,7 +51,7 @@ def preprocess_egmd():
     # run preprocessing for each split
     for split_name, df in df_splits.items():
         # Create split directory
-        split_dir = CONFIG.dataset.dir / split_name
+        split_dir = CONFIG.data.dir / split_name
         os.makedirs(split_dir, exist_ok=True)
 
         # Skip if the target already exists
@@ -73,7 +73,10 @@ def preprocess_egmd():
 
         # Run the parallel preprocesser
         logger.info(f"Extracing split '{split_name}' ...")
-        matrices = converter.midi_to_hov_batch(file_infos)
+        matrices = converter.midi_to_hov_batch(
+            file_infos,
+            n_workers=CONFIG.data.num_workers,
+        )
 
         # Store the matrices as .npz
         logger.info(f"Saving '{data_filename}' ...")
