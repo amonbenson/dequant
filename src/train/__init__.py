@@ -69,12 +69,6 @@ def train():
 
     logger.info(f"Using device '{device}'")
 
-    if CONFIG.dataset.step_size % CONFIG.model.resolution == 0:
-        logger.warning(
-            f"The parameter dataset.step_size ({CONFIG.dataset.step_size}) is equally divisible by model.resolution ({CONFIG.model.resolution}). "
-            + "This will result in poor model performance, because the model will never receive sequences starting at any other beat than 0."
-        )
-
     train_set, test_set, validation_set = [
         create_dataloader(CONFIG.dataset.dir / split_name)
         for split_name in ("train", "test", "validation")

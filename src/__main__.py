@@ -26,8 +26,15 @@ def main():
         case "preprocess":
             preprocess()
         case "train":
+            if CONFIG.dataset.step_size % CONFIG.model.resolution == 0:
+                logger.warning(
+                    f"The parameter dataset.step_size ({CONFIG.dataset.step_size}) is equally divisible by model.resolution ({CONFIG.model.resolution}). "
+                    + "This will result in poor model performance, because the model will never receive sequences starting at any other beat than 0."
+                )
+
             if CONFIG.train.auto_preprocess:
                 preprocess()
+
             train()
         case _:
             logger.error(f"Unknown command '{args.command}'")
