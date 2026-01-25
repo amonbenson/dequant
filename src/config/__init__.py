@@ -1,6 +1,7 @@
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass, field, fields
+from typing import Optional, Literal
+import tyro
 from ..hov.converter import DrumCategory, DEFAULT_DRUM_CATEGORIES
 
 
@@ -21,7 +22,7 @@ class DataConfig:
     cache_dir: Path = Path(".data/tmp")
 
     # Preprocessing
-    num_workers: Optional[int] = None
+    num_workers: int = 0
 
     # Data sources
     egmd: EGMDSourceConfig = field(default_factory=EGMDSourceConfig)
@@ -69,7 +70,7 @@ class TrainConfig:
 
     # Data loading
     auto_preprocess: bool = True
-    sample_stride: Optional[int] = 777
+    sample_stride: int = 777
     sample_shuffle: bool = True
 
     # Checkpointing
@@ -84,6 +85,8 @@ class TrainConfig:
 class RootConfig:
     """Root configuration."""
 
+    action: Literal["preprocess", "train"] = "train"
+
     data: DataConfig = field(default_factory=DataConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
@@ -94,4 +97,8 @@ CONFIG = RootConfig()
 
 def update_config(new_config: RootConfig):
     global CONFIG
-    CONFIG = new_config
+
+    # Do not replace the global config directly, because this would make modules which already
+    # imported the name use the wrong configuration object.
+    for f in fields(RootConfig):
+        setattr(CONFIG, f.name, getattr(new_config, f.name))

@@ -10,7 +10,6 @@ import time
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Optional
 import logging
 import os
 import traceback
@@ -163,7 +162,7 @@ class HOVConverter:
 
         return matrices
 
-    def midi_to_hov_batch(self, file_infos: FileInfos, n_workers: Optional[int] = None):
+    def midi_to_hov_batch(self, file_infos: FileInfos, n_workers: int = 0):
         """
         Extract matrices from MIDI files with parallel processing
 
@@ -175,7 +174,7 @@ class HOVConverter:
         Returns:
             List of matrices extracted from MIDI files
         """
-        if n_workers is None:
+        if n_workers <= 0:
             n_workers = os.cpu_count()
 
         start = time.perf_counter()
