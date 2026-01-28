@@ -30,6 +30,18 @@ python -m src preprocess
 python -m src train
 ```
 
+By default, training will resume from the latest checkpoint. To turn that feature off, type:
+
+```shell
+python -m src --config.train.no-resume train
+```
+
+To load a specific checkpoint, type:
+
+```shell
+python -m src --config.train.resume-from "./data/checkpoints/<name-of-checkpoint>.pt" train
+```
+
 ## Configuration
 
 To see a list of available commands and configuration options, type:

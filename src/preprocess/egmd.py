@@ -1,4 +1,3 @@
-import os
 import logging
 import pandas as pd
 import numpy as np
@@ -21,7 +20,7 @@ def preprocess_egmd():
     meta_filename = CONFIG.data.cache_dir / "egmd-meta.csv"
 
     # Create tmp directory for downloading files
-    os.makedirs(CONFIG.data.cache_dir, exist_ok=True)
+    CONFIG.data.cache_dir.mkdir(parents=True, exist_ok=True)
 
     # Download midi and meta data
     logger.info(f"Downloading to '{CONFIG.data.cache_dir}' ...")
@@ -39,7 +38,7 @@ def preprocess_egmd():
     # filter all non 4-4
     df_filt = df[df["time_signature"] == "4-4"]
     filter_count = len(df) - len(df_filt)
-    print(f"Removed {filter_count} files due to mismatching time signature")
+    logger.debug(f"Removed {filter_count} files due to mismatching time signature")
 
     # split in train, test, validaton
     df_splits = {
@@ -52,7 +51,7 @@ def preprocess_egmd():
     for split_name, df in df_splits.items():
         # Create split directory
         split_dir = CONFIG.data.dir / split_name
-        os.makedirs(split_dir, exist_ok=True)
+        split_dir.mkdir(parents=True, exist_ok=True)
 
         # Skip if the target already exists
         data_filename = split_dir / "egmd.npz"

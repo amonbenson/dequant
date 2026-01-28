@@ -72,8 +72,10 @@ class TrainConfig:
     sample_stride: int = 777  # offset in which sample sequences are taken from the dataset
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
+    resume: bool = True  # resume training from a previously saved checkpoint
+    resume_from: Optional[Path] = None  # path to the checkpoint to resume from. If not provided, use the latest
     checkpoint_dir: Path = Path(".data/checkpoints")  # where to store checkpoints
-    save_every_n_epochs: int = 1  # how often to store checkpoints
+    save_every_n_epochs: int = 2  # how often to store checkpoints
 
     # patience: int = 10
 
