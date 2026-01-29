@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from typing import Optional
 from datetime import datetime
+import multiprocessing
 from ..utils.checkpoint import Checkpoint
 from ..data.datasets.hov_dataset import HOVEncoderDecoderDataset, HOVDatasetConfig
 from ..model import (
@@ -59,9 +60,9 @@ class Trainer:
         self.model.train()
 
         for encoder_input, decoder_input, decoder_target in self.train_set:
-            encoder_input = encoder_input.to(self.device)
-            decoder_input = decoder_input.to(self.device)
-            decoder_target = decoder_target.to(self.device)
+            encoder_input = encoder_input.to(self.device, non_blocking=True)
+            decoder_input = decoder_input.to(self.device, non_blocking=True)
+            decoder_target = decoder_target.to(self.device, non_blocking=True)
 
             # Forward pass
             predictions = self.model(encoder_input, decoder_input)
@@ -100,9 +101,9 @@ class Trainer:
 
         with torch.no_grad():
             for encoder_input, decoder_input, decoder_target in self.validation_set:
-                encoder_input = encoder_input.to(self.device)
-                decoder_input = decoder_input.to(self.device)
-                decoder_target = decoder_target.to(self.device)
+                encoder_input = encoder_input.to(self.device, non_blocking=True)
+                decoder_input = decoder_input.to(self.device, non_blocking=True)
+                decoder_target = decoder_target.to(self.device, non_blocking=True)
 
                 predictions = self.model(encoder_input, decoder_input)
 
@@ -157,6 +158,9 @@ class Trainer:
             dataset,
             batch_size=CONFIG.train.batch_size,
             shuffle=CONFIG.train.sample_shuffle,
+            pin_memory=True if torch.cuda.is_available() else False,
+            num_workers=multiprocessing.cpu_count(),  # Adjust based on your CPU cores
+            persistent_workers=True,  # Keep workers alive between epochs
         )
         return dataloader
 

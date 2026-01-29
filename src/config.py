@@ -69,13 +69,13 @@ class TrainConfig:
     batch_size: int = 32  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training
-    sample_stride: int = 3  # offset in which sample sequences are taken from the dataset
+    sample_stride: int = 31  # offset in which sample sequences are taken from the dataset
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     resume: bool = True  # resume training from a previously saved checkpoint
     resume_from: Optional[Path] = None  # path to the checkpoint to resume from. If not provided, use the latest
     checkpoint_dir: Path = Path(".data/checkpoints")  # where to store checkpoints
-    save_every_n_epochs: int = 10  # how often to store checkpoints
+    save_every_n_epochs: int = 1  # how often to store checkpoints
 
     # patience: int = 10
 
