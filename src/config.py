@@ -53,7 +53,7 @@ class TransformerConfig:
 class ModelConfig:
     """Configuration for the Dequant model."""
 
-    max_seq_len: int = 512  # maximum number of sequences
+    max_seq_len: int = 256  # maximum number of sequences
     drums: DrumsConfig = field(default_factory=DrumsConfig)  # drum-specific configuration
     transformer: TransformerConfig = field(default_factory=TransformerConfig)  # transformer-specific configuration
 
@@ -65,7 +65,7 @@ class TrainConfig:
     device: Optional[str] = None  # "cpu", "cuda", "mps"
 
     learning_rate: float = 1e-4  # optimizer learning rate
-    num_epochs: int = 100  # maximum number of epochs to train for
+    num_epochs: int = 1000  # maximum number of epochs to train for
     batch_size: int = 32  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training

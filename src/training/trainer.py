@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from typing import Optional
 from datetime import datetime
 from ..utils.checkpoint import Checkpoint
@@ -49,6 +50,8 @@ class Trainer:
         self.loss_fn = torch.nn.MSELoss()
 
         self.epoch = 0
+        self.global_step = 0
+        self.writer = SummaryWriter()
 
     def train_epoch(self):
         # Training
@@ -71,6 +74,24 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
 
+            # Log training metrics
+            self.writer.add_scalar("Loss/train", loss.item(), self.global_step)
+
+            # Log gradient norms for monitoring training stability
+            total_norm = 0.0
+            for p in self.model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)
+                    total_norm += param_norm.item() ** 2
+            total_norm = total_norm**0.5
+            self.writer.add_scalar("Gradients/norm", total_norm, self.global_step)
+
+            # Log learning rate
+            current_lr = self.optimizer.param_groups[0]["lr"]
+            self.writer.add_scalar("Learning_rate", current_lr, self.global_step)
+
+            self.global_step += 1
+
         # Valiation
         logger.info("Validating ...")
         self.model.eval()
@@ -89,14 +110,16 @@ class Trainer:
                 total_loss += loss.item()
                 num_batches += 1
 
-        # Update epoch
+        # Calculate and log average validation loss
         avg_loss = total_loss / num_batches
-        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Loss: {avg_loss:.6f}")
-        self.epoch += 1
+        self.writer.add_scalar("Loss/validation", avg_loss, self.epoch)
 
         # Save a checkpoint to the default path
-        if (self.epoch + 1) % CONFIG.train.save_every_n_epochs == 0:
+        if self.epoch % CONFIG.train.save_every_n_epochs == 0:
             self.save_checkpoint()
+
+        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Loss: {avg_loss:.6f}")
+        self.epoch += 1
 
     def train(self):
         # Resume from a previous checkpoint
@@ -114,6 +137,9 @@ class Trainer:
         # Train until the specified epoch
         while self.epoch < CONFIG.train.num_epochs:
             self.train_epoch()
+
+        # Close the tensorboard writer
+        self.writer.close()
 
     @staticmethod
     def create_dataloader(dir: Path):
@@ -145,6 +171,7 @@ class Trainer:
             filename,
             config=CONFIG,
             epoch=self.epoch,
+            global_step=self.global_step,
             model=self.model,
             optimizer=self.optimizer,
             loss_fn=self.loss_fn,
@@ -160,7 +187,7 @@ class Trainer:
                 raise FileNotFoundError("No checkpoints were found.")
 
         # Load the checkpoint and apply all parameters
-        self.epoch, self.loss_fn = Checkpoint.load(
+        self.epoch, self.loss_fn, self.global_step = Checkpoint.load(
             filename,
             device=self.device,
             config=CONFIG,
