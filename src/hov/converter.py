@@ -5,7 +5,7 @@ Optimized with parallel processing and vectorized operations
 
 import numpy as np
 from pathlib import Path
-from pretty_midi import PrettyMIDI, Instrument, Note
+from pretty_midi import PrettyMIDI, Instrument, Note, TimeSignature, KeySignature
 import time
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -22,12 +22,14 @@ FileInfos = list[tuple[Path, int]]
 
 @dataclass
 class HOVConverterConfig:
-    resolution: int = 4
+    steps_per_beat: int = 4
     categories: list[DrumCategory] = field(default_factory=DEFAULT_DRUM_CATEGORIES)
     _category_lookup: np.ndarray = field(init=False)
+    _category_reverse_lookup: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        # initialize the category lookup table
+        # Initialize the category lookup table
+        # Maps pitch -> category id or -1 if the note has no category
         self._category_lookup = -np.ones(128, dtype=np.int8)
         for i, cat in enumerate(self.categories):
             for pitch in cat.pitches:
@@ -36,6 +38,11 @@ class HOVConverterConfig:
                 if self._category_lookup[pitch] != -1:
                     raise ValueError(f"Category: {cat.label}: pitch {pitch} was already mapped to another category. Category pitches must be unique!")
                 self._category_lookup[pitch] = i
+
+        # Initialize the reverse-category lookup. As each category might have multiple notes
+        # associated with it, only choose the first one.
+        # Maps category id -> pitch
+        self._category_reverse_lookup = np.array(cat.pitches[0] for cat in self.categories)
 
 
 class HOVConverter:
@@ -80,8 +87,8 @@ class HOVConverter:
 
         # Cache repeated calculations (optimization #6)
         bps = tempo_bpm / 60.0  # beats per second
-        steps_per_bar = self.config.resolution * 4  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
-        steps_ps = bps * self.config.resolution  # steps per second
+        steps_per_bar = self.config.steps_per_beat * 4  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
+        steps_ps = bps * self.config.steps_per_beat  # steps per second
         step = 1.0 / steps_ps
 
         # get vector / grid length for binary Matrix
@@ -202,3 +209,33 @@ class HOVConverter:
         logger.info(f"Processed {len(file_infos)} MIDI files in {elapsed:.6f} seconds")
 
         return data_list
+
+    def hov_to_midi(self, hov: np.ndarray, tempo_bpm: int = 120) -> PrettyMIDI:
+        assert len(hov.shape) == 3, "HOV should have shape (seq_len, num_instruments, 3)"
+        assert hov.shape[2] == 3, f"HOV dimension should have been 3 but was {hov.shape[2]}"
+
+        # Setup metadata
+        midi = PrettyMIDI(resolution=480, initial_tempo=tempo_bpm)
+        midi.time_signature_changes.append(TimeSignature(4, 4, 0))
+        midi.key_signature_changes.append(KeySignature(12, 0))
+
+        # Create a drum track
+        drum_track = Instrument(program=0, is_drum=True, name="Drums")
+
+        # Iterate through each hit (e.g. where the hit matrix is set to 1)
+        steps_per_second = self.config.steps_per_beat * tempo_bpm / 60
+        for step, category in np.argwhere(hov[..., 0]):
+            # Calculate the time from the step number and offset
+            offset = hov[step, category, 1]
+            step_with_offset = step + offset
+            start = step_with_offset / steps_per_second
+            end = start + 1 / steps_per_second  # make duration equal one step
+
+            # Get the note pitch and velocity
+            pitch = int(self.config._category_reverse_lookup[category])
+            velocity = int(hov[step, category, 2] * 127)
+
+            # Append the note
+            drum_track.notes.append(Note(pitch=pitch, velocity=velocity, start=start, end=end))
+
+        return midi

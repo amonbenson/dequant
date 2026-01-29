@@ -11,7 +11,7 @@ logger = logging.getLogger("egmd")
 def preprocess_egmd():
     converter = HOVConverter(
         HOVConverterConfig(
-            resolution=CONFIG.model.drums.steps_per_beat,
+            steps_per_beat=CONFIG.model.drums.steps_per_beat,
             categories=CONFIG.model.drums.categories,
         )
     )
