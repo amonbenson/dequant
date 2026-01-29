@@ -2,9 +2,9 @@ import logging
 from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
-from dataclasses import asdict
 from typing import Optional
 from datetime import datetime
+from .checkpoint import Checkpoint
 from ..hov.dataset import HOVEncoderDecoderDataset, HOVDatasetConfig
 from ..model import (
     DequantTransformer as DequantTransformer,
@@ -140,19 +140,14 @@ class Trainer:
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             filename = CONFIG.train.checkpoint_dir / f"cp_{timestamp}.pt"
 
-        # Store the file in the provided directory
-        logger.info(f"Saving checkpoint to {filename} ...")
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {
-                "config": asdict(CONFIG),
-                "epoch": self.epoch,
-                "model": self.model.state_dict(),
-                "optimizer": self.optimizer.state_dict(),
-                # "scheduler": self.scheduler.state_dict(),
-                "loss_fn": self.loss_fn,
-            },
+        # Save the checkpoint
+        Checkpoint.save(
             filename,
+            config=CONFIG,
+            epoch=self.epoch,
+            model=self.model,
+            optimizer=self.optimizer,
+            loss_fn=self.loss_fn,
         )
 
     def load_checkpoint(self, filename: Optional[Path] = None):
@@ -164,16 +159,11 @@ class Trainer:
             if filename is None:
                 raise FileNotFoundError("No checkpoints were found.")
 
-        checkpoint = torch.load(filename, map_location=self.device, weights_only=False)
-
-        # Validate the checkpoint config
-        if checkpoint["config"] != asdict(CONFIG):
-            logger.warning("Loading checkpoint from a different configuration!")
-        logger.info(f"Loading checkpoint from {filename} ...")
-
-        # Load all weights and data
-        self.model.load_state_dict(checkpoint["model"])
-        self.optimizer.load_state_dict(checkpoint["optimizer"])
-        # self.scheduler.load_state_dict(checkpoint["scheduler"])
-        self.epoch = checkpoint["epoch"]
-        self.loss_fn = checkpoint["loss_fn"]
+        # Load the checkpoint and apply all parameters
+        self.epoch, self.loss_fn = Checkpoint.load(
+            filename,
+            device=self.device,
+            config=CONFIG,
+            model=self.model,
+            optimizer=self.optimizer,
+        )

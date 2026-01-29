@@ -51,15 +51,35 @@ class HOVConverter:
     def __init__(self, config: HOVConverterConfig):
         self.config = config
 
-    def midi_to_hov(self, midi_obj: Path | PrettyMIDI, tempo_bpm: int = 120):
+    def _as_pretty_midi(self, midi: Path | PrettyMIDI) -> PrettyMIDI:
         # Check if a midi object was passed directly or we should read it from a file
-        if isinstance(midi_obj, PrettyMIDI):
-            midi_data = midi_obj
+        if isinstance(midi, PrettyMIDI):
+            return midi
         else:
             try:
-                midi_data = PrettyMIDI(midi_obj)
+                return PrettyMIDI(midi)
             except Exception as e:
-                raise ValueError(f"Failed to parse MIDI file {midi_obj}: {e}")
+                raise ValueError(f"Failed to parse MIDI file {midi}: {e}")
+
+    def extract_tempo(self, midi: Path | PrettyMIDI) -> float:
+        midi = self._as_pretty_midi(midi)
+        _, tempi = midi.get_tempo_changes()
+
+        if len(tempi) == 0:
+            logger.warning("Midi contains no tempo data.")
+            return 120.0
+
+        if len(tempi) > 1:
+            logger.warning("Midi file contains tempo changes. Using only the first value")
+
+        return float(tempi[0])
+
+    def midi_to_hov(self, midi: Path | PrettyMIDI, tempo_bpm: int = None):
+        midi_data = self._as_pretty_midi(midi)
+
+        # If no tempo was provided, we can still try to extract it from the midi file
+        if tempo_bpm is None:
+            tempo_bpm = round(self.extract_tempo(midi_data))
 
         # Get drum track (should be only drum track)
         drum_track: Instrument = None
@@ -68,7 +88,7 @@ class HOVConverter:
                 drum_track = instrument
                 break
         else:
-            raise ValueError(f"No drum track found in {midi_obj}")
+            raise ValueError(f"No drum track found in {midi}")
 
         # iterate over notes
         onsets = []
