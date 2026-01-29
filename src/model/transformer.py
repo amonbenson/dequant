@@ -22,6 +22,7 @@ class DequantTransformer(nn.Module):
         d_encoder_input = config.num_instruments * 1
         d_decoder_input = config.num_instruments * 2
         d_model = config.d_model
+        dropout = config.dropout
 
         # Input projections
         self.encoder_input_proj = nn.Linear(d_encoder_input, d_model)
@@ -31,8 +32,8 @@ class DequantTransformer(nn.Module):
         self.dropout = nn.Dropout(config.dropout)
 
         # Encoder and decoder blocks
-        self.encoder = Encoder(EncoderConfig(d_model=d_model))
-        self.decoder = Decoder(DecoderConfig(d_model=d_model))
+        self.encoder = Encoder(EncoderConfig(d_model=d_model, dropout=dropout))
+        self.decoder = Decoder(DecoderConfig(d_model=d_model, dropout=dropout))
 
         # Output projection
         self.output_proj = nn.Linear(d_model, d_decoder_input)

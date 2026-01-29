@@ -43,6 +43,7 @@ class Trainer:
                 max_seq_len=CONFIG.model.max_seq_len,
                 num_instruments=CONFIG.model.drums.num_instruments,
                 d_model=CONFIG.model.transformer.d_model,
+                dropout=CONFIG.model.transformer.dropout,
             )
         )
         self.model = self.model.to(self.device)
@@ -151,7 +152,7 @@ class Trainer:
                 dir=dir,
                 seq_len=CONFIG.model.max_seq_len,
                 sample_stride=CONFIG.train.sample_stride,
-                filter_empty=True,
+                filter_empty=False,
             )
         )
         dataloader = DataLoader(

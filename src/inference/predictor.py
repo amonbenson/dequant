@@ -16,6 +16,7 @@ class Predictor:
                 max_seq_len=CONFIG.model.max_seq_len,
                 num_instruments=CONFIG.model.drums.num_instruments,
                 d_model=CONFIG.model.transformer.d_model,
+                dropout=CONFIG.model.transformer.dropout,
             )
         )
         Checkpoint.load(

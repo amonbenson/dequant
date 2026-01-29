@@ -47,6 +47,7 @@ class TransformerConfig:
     """Configuration for the transformer architecture."""
 
     d_model: int = 32  # internal model depth
+    dropout: float = 0.5  # dropout for all layers
 
 
 @dataclass
@@ -66,10 +67,10 @@ class TrainConfig:
 
     learning_rate: float = 1e-4  # optimizer learning rate
     num_epochs: int = 1000  # maximum number of epochs to train for
-    batch_size: int = 128  # number of samples per batch
+    batch_size: int = 512  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training
-    sample_stride: int = 31  # offset in which sample sequences are taken from the dataset
+    sample_stride: int = 1  # offset in which sample sequences are taken from the dataset
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     resume: bool = True  # resume training from a previously saved checkpoint
