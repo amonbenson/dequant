@@ -42,7 +42,7 @@ class HOVConverterConfig:
         # Initialize the reverse-category lookup. As each category might have multiple notes
         # associated with it, only choose the first one.
         # Maps category id -> pitch
-        self._category_reverse_lookup = np.array(cat.pitches[0] for cat in self.categories)
+        self._category_reverse_lookup = np.array([cat.pitches[0] for cat in self.categories])
 
 
 class HOVConverter:
@@ -217,7 +217,7 @@ class HOVConverter:
         # Setup metadata
         midi = PrettyMIDI(resolution=480, initial_tempo=tempo_bpm)
         midi.time_signature_changes.append(TimeSignature(4, 4, 0))
-        midi.key_signature_changes.append(KeySignature(12, 0))
+        midi.key_signature_changes.append(KeySignature(0, 0))
 
         # Create a drum track
         drum_track = Instrument(program=0, is_drum=True, name="Drums")
@@ -237,5 +237,8 @@ class HOVConverter:
 
             # Append the note
             drum_track.notes.append(Note(pitch=pitch, velocity=velocity, start=start, end=end))
+
+        # Add the drum track
+        midi.instruments.append(drum_track)
 
         return midi
