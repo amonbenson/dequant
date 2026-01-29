@@ -1,6 +1,6 @@
 from .drum_category import DrumCategory, DEFAULT_DRUM_CATEGORIES
-from .converter import HOVConverter, HOVConverterConfig
-from .dataset import HOVDataset, HOVDatasetConfig, HOVEncoderDecoderDataset
+from .converters.hov_converter import HOVConverter, HOVConverterConfig
+from .datasets.hov_dataset import HOVDataset, HOVDatasetConfig, HOVEncoderDecoderDataset
 
 __all__ = [
     "DrumCategory",

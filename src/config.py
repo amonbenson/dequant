@@ -1,7 +1,7 @@
 from pathlib import Path
 from dataclasses import dataclass, field, fields
 from typing import Optional
-from ..hov.converter import DrumCategory, DEFAULT_DRUM_CATEGORIES
+from .data.converters.hov_converter import DrumCategory, DEFAULT_DRUM_CATEGORIES
 
 
 @dataclass
@@ -46,14 +46,14 @@ class DrumsConfig:
 class TransformerConfig:
     """Configuration for the transformer architecture."""
 
-    d_model: int = 128  # internal model depth
+    d_model: int = 64  # internal model depth
 
 
 @dataclass
 class ModelConfig:
     """Configuration for the Dequant model."""
 
-    max_seq_len: int = 128  # maximum number of sequences
+    max_seq_len: int = 512  # maximum number of sequences
     drums: DrumsConfig = field(default_factory=DrumsConfig)  # drum-specific configuration
     transformer: TransformerConfig = field(default_factory=TransformerConfig)  # transformer-specific configuration
 
@@ -75,7 +75,7 @@ class TrainConfig:
     resume: bool = True  # resume training from a previously saved checkpoint
     resume_from: Optional[Path] = None  # path to the checkpoint to resume from. If not provided, use the latest
     checkpoint_dir: Path = Path(".data/checkpoints")  # where to store checkpoints
-    save_every_n_epochs: int = 2  # how often to store checkpoints
+    save_every_n_epochs: int = 10  # how often to store checkpoints
 
     # patience: int = 10
 

@@ -8,9 +8,10 @@ class DrumCategory:
 
 
 # See https://musescore.org/sites/musescore.org/files/General%20MIDI%20Standard%20Percussion%20Set%20Key%20Map.pdf
+# Note, the first note value is used for reverse-lookup, so we use the more common notes (36 and 38) for Kick and Snare
 DEFAULT_DRUM_CATEGORIES = [
-    DrumCategory("Kick", (35, 36)),
-    DrumCategory("Snare", (37, 38, 40)),
+    DrumCategory("Kick", (36, 35)),
+    DrumCategory("Snare", (38, 37, 39, 40)),
     DrumCategory("Floor Tom", (41, 43)),
     DrumCategory("Low Tom", (45, 47)),
     DrumCategory("High Tom", (48, 50)),

@@ -1,22 +1,46 @@
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated, Union
 import tyro
-from .config import RootConfig, update_config, CONFIG
-from .preprocess import preprocess
-from .train import train
+from .config import RootConfig, update_config
+from . import cli
 
 logger = logging.getLogger("main")
 
 
 @dataclass
-class TrainCommand:
-    pass
+class PreprocessCommand:
+    """Download datasets and convert them to HOV representation."""
 
 
 @dataclass
-class PreprocessCommand:
-    pass
+class TrainCommand:
+    "Train the model."
+
+
+@dataclass
+class PlayCommand:
+    """Play back a midi file or a dataset sample."""
+
+    input: Annotated[Path, tyro.conf.Positional]
+
+
+@dataclass
+class QuantizeCommand:
+    """Use the HOV representation to quantize a midi file."""
+
+    input: Annotated[Path, tyro.conf.Positional]
+    output: Annotated[Path, tyro.conf.Positional]
+
+
+@dataclass
+class DequantizeCommand:
+    """Use a trained model to dequantize a midi file"""
+
+    input: Annotated[Path, tyro.conf.Positional]
+    output: Annotated[Path, tyro.conf.Positional]
+    checkpoint: Annotated[Path, tyro.conf.Positional]
 
 
 @dataclass
@@ -25,6 +49,9 @@ class Args:
     command: Union[
         Annotated[PreprocessCommand, tyro.conf.subcommand("preprocess", prefix_name="")],
         Annotated[TrainCommand, tyro.conf.subcommand("train", prefix_name="")],
+        Annotated[PlayCommand, tyro.conf.subcommand("play", prefix_name="")],
+        Annotated[QuantizeCommand, tyro.conf.subcommand("quantize", prefix_name="")],
+        Annotated[DequantizeCommand, tyro.conf.subcommand("dequantize", prefix_name="")],
     ]
 
 
@@ -35,20 +62,24 @@ def main():
     update_config(args.config)
 
     # Run the selected action
-    match args.command:
-        case PreprocessCommand():
-            preprocess()
-        case TrainCommand():
-            if CONFIG.train.sample_stride % CONFIG.model.drums.steps_per_beat == 0:
-                logger.warning(
-                    f"The parameter data.sample_stride ({CONFIG.data.sample_stride}) is equally divisible by model.drums.steps_per_beat ({CONFIG.model.drums.steps_per_beat}). "
-                    + "This will result in poor model performance, because the model will never receive sequences starting at any other beat than 0."
-                )
-
-            if CONFIG.train.auto_preprocess:
-                preprocess()
-
-            train()
+    match args.command.__class__.__name__:
+        case "PreprocessCommand":
+            cli.run_preprocess()
+        case "TrainCommand":
+            cli.run_train()
+        case "PlayCommand":
+            cli.run_play(args.command.input)
+        case "QuantizeCommand":
+            cli.run_quantize(
+                args.command.input,
+                args.command.output,
+            )
+        case "DequantizeCommand":
+            cli.run_dequantize(
+                args.command.input,
+                args.command.output,
+                args.command.checkpoint,
+            )
         case _:
             logger.error(f"Unknown command '{args.command}'")
 

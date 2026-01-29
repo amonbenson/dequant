@@ -42,6 +42,28 @@ To load a specific checkpoint, type:
 python -m src --config.train.resume-from "./data/checkpoints/<name-of-checkpoint>.pt" train
 ```
 
+## Quantization
+
+To evaluate the model performance, it might make sense to manually quantize a drum pattern and then use the model to dequantize it again. The quantization process (removing velocity and timing offset information) can be triggered using the following commands:
+
+```bash
+# Copy a sample form our dataset to the .data directory
+cp .data/tmp/egmd-midi/e-gmd-v1.0.0/drummer1/eval_session/1_funk-groove1_138_beat_4-4_1.midi .data/original.midi
+
+# Use the HOV algorithm to quantize the midi file
+python -m src quantize .data/original.midi .data/quantized.midi
+```
+
+## Dequantization
+
+A quantized MIDI file (obtained either from the command above or from another application) can be dequantized using the following command:
+
+```bash
+python -m src dequantize .data/quantized.midi .data/dequantized.midi .data/checkpoints/cp_<timestamp>.pt
+```
+
+This will load a previously saved checkpoint and use our model to add back velocity and offset information to the midi data.
+
 ## Configuration
 
 To see a list of available commands and configuration options, type:

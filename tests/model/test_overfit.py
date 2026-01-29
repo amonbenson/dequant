@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from src.model import DequantTransformer, DequantTransformerConfig
-from src.hov import HOVEncoderDecoderDataset, HOVDatasetConfig
+from src.data import HOVEncoderDecoderDataset, HOVDatasetConfig
 
 
 def test_dequant_overfitting():

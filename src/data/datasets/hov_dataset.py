@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 import logging
 
-logger = logging.getLogger("dataset")
+logger = logging.getLogger("hov_dataset")
 
 
 @dataclass
@@ -83,43 +83,33 @@ class HOVDataset(Dataset):
 
 
 class HOVEncoderDecoderDataset(HOVDataset):
-    def __init__(
-        self,
-        config: HOVDatasetConfig,
-        *,
-        data: Optional[np.ndarray] = None,
-    ):
-        # Pass the config arguments as they are, but use a longer sequence length internally,
-        # so we can generate the shifted decoder input
-        super().__init__(
-            HOVDatasetConfig(
-                dir=config.dir,
-                seq_len=config.seq_len + 1,
-                sample_stride=config.sample_stride,
-                filter_empty=config.filter_empty,
-            ),
-            data=data,
-        )
-
     def __getitem__(
         self,
         index: int,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # Get two sequences, the first one is missing the last timestep,
-        # the second one includes it (and is missing the first timestep)
-        current_sequence = super().__getitem__(index)[:-1]
-        next_sequence = super().__getitem__(index)[1:]
+        # Get the full target sequence that should be generated
+        target = super().__getitem__(index)
 
-        # Encoder input: Use the next sequence, but include only the hits
+        # Encoder input: Use the full sequence, but include only the hits
         # (this is what the encoder uses as its "baseline" for generating the next timestep)
-        encoder_input = next_sequence[..., 0:1]
+        encoder_input = target[..., 0]
 
-        # Decoder input: Use the current sequence, but include only the offset and velocity info.
+        # Decoder input: Shift the sequence to exclude the next step and include the start token.
         # This is what has already been generated
-        decoder_input = current_sequence[..., 1:3]
+        decoder_input = torch.cat(
+            [
+                self.start_token().unsqueeze(0),
+                target[:-1, :, 1:3],
+            ],
+            dim=0,
+        )
 
-        # Decoder target: Use the next sequence, but include only the offset and velocity info.
+        # Decoder target: Use the full sequence, but include only the offset and velocity info.
         # This is what should be generated
-        decoder_target = next_sequence[..., 1:3]
+        decoder_target = target[:, :, 1:3]
 
         return (encoder_input, decoder_input, decoder_target)
+
+    def start_token(self) -> torch.Tensor:
+        num_instruments = self._data.shape[1]
+        return torch.zeros((num_instruments, 2))

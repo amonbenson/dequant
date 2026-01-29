@@ -2,8 +2,8 @@ import logging
 import pandas as pd
 import numpy as np
 from .download import download_file, unzip_file
-from ..hov.converter import HOVConverter, HOVConverterConfig
-from ..config import CONFIG
+from ..converters.hov_converter import HOVConverter, HOVConverterConfig
+from ...config import CONFIG
 
 logger = logging.getLogger("egmd")
 
@@ -11,7 +11,7 @@ logger = logging.getLogger("egmd")
 def preprocess_egmd():
     converter = HOVConverter(
         HOVConverterConfig(
-            resolution=CONFIG.model.drums.steps_per_beat,
+            steps_per_beat=CONFIG.model.drums.steps_per_beat,
             categories=CONFIG.model.drums.categories,
         )
     )

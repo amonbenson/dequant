@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from dataclasses import dataclass
 from pretty_midi import PrettyMIDI, Instrument, Note
-from src.hov import DrumCategory, HOVConverter, HOVConverterConfig
+from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
 
 REDUCED_DRUM_CATEGORIES = [

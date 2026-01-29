@@ -5,7 +5,7 @@ Optimized with parallel processing and vectorized operations
 
 import numpy as np
 from pathlib import Path
-from pretty_midi import PrettyMIDI, Instrument, Note
+from pretty_midi import PrettyMIDI, Instrument, Note, TimeSignature, KeySignature
 import time
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -13,21 +13,23 @@ from dataclasses import dataclass, field
 import logging
 import os
 import traceback
-from .drum_category import DrumCategory, DEFAULT_DRUM_CATEGORIES
+from ..drum_category import DrumCategory, DEFAULT_DRUM_CATEGORIES
 
-logger = logging.getLogger("hov")
+logger = logging.getLogger("hov_converter")
 
 FileInfos = list[tuple[Path, int]]
 
 
 @dataclass
 class HOVConverterConfig:
-    resolution: int = 4
+    steps_per_beat: int = 4
     categories: list[DrumCategory] = field(default_factory=DEFAULT_DRUM_CATEGORIES)
     _category_lookup: np.ndarray = field(init=False)
+    _category_reverse_lookup: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        # initialize the category lookup table
+        # Initialize the category lookup table
+        # Maps pitch -> category id or -1 if the note has no category
         self._category_lookup = -np.ones(128, dtype=np.int8)
         for i, cat in enumerate(self.categories):
             for pitch in cat.pitches:
@@ -37,20 +39,45 @@ class HOVConverterConfig:
                     raise ValueError(f"Category: {cat.label}: pitch {pitch} was already mapped to another category. Category pitches must be unique!")
                 self._category_lookup[pitch] = i
 
+        # Initialize the reverse-category lookup. As each category might have multiple notes
+        # associated with it, only choose the first one.
+        # Maps category id -> pitch
+        self._category_reverse_lookup = np.array([cat.pitches[0] for cat in self.categories])
+
 
 class HOVConverter:
     def __init__(self, config: HOVConverterConfig):
         self.config = config
 
-    def midi_to_hov(self, midi_obj: Path | PrettyMIDI, tempo_bpm: int = 120):
+    def _as_pretty_midi(self, midi: Path | PrettyMIDI) -> PrettyMIDI:
         # Check if a midi object was passed directly or we should read it from a file
-        if isinstance(midi_obj, PrettyMIDI):
-            midi_data = midi_obj
+        if isinstance(midi, PrettyMIDI):
+            return midi
         else:
             try:
-                midi_data = PrettyMIDI(midi_obj)
+                return PrettyMIDI(midi)
             except Exception as e:
-                raise ValueError(f"Failed to parse MIDI file {midi_obj}: {e}")
+                raise ValueError(f"Failed to parse MIDI file {midi}: {e}")
+
+    def extract_tempo(self, midi: Path | PrettyMIDI) -> float:
+        midi = self._as_pretty_midi(midi)
+        _, tempi = midi.get_tempo_changes()
+
+        if len(tempi) == 0:
+            logger.warning("Midi contains no tempo data.")
+            return 120.0
+
+        if len(tempi) > 1:
+            logger.warning("Midi file contains tempo changes. Using only the first value")
+
+        return float(tempi[0])
+
+    def midi_to_hov(self, midi: Path | PrettyMIDI, tempo_bpm: int = None):
+        midi_data = self._as_pretty_midi(midi)
+
+        # If no tempo was provided, we can still try to extract it from the midi file
+        if tempo_bpm is None:
+            tempo_bpm = round(self.extract_tempo(midi_data))
 
         # Get drum track (should be only drum track)
         drum_track: Instrument = None
@@ -59,7 +86,7 @@ class HOVConverter:
                 drum_track = instrument
                 break
         else:
-            raise ValueError(f"No drum track found in {midi_obj}")
+            raise ValueError(f"No drum track found in {midi}")
 
         # iterate over notes
         onsets = []
@@ -80,8 +107,8 @@ class HOVConverter:
 
         # Cache repeated calculations (optimization #6)
         bps = tempo_bpm / 60.0  # beats per second
-        steps_per_bar = self.config.resolution * 4  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
-        steps_ps = bps * self.config.resolution  # steps per second
+        steps_per_bar = self.config.steps_per_beat * 4  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
+        steps_ps = bps * self.config.steps_per_beat  # steps per second
         step = 1.0 / steps_ps
 
         # get vector / grid length for binary Matrix
@@ -202,3 +229,36 @@ class HOVConverter:
         logger.info(f"Processed {len(file_infos)} MIDI files in {elapsed:.6f} seconds")
 
         return data_list
+
+    def hov_to_midi(self, hov: np.ndarray, tempo_bpm: int = 120) -> PrettyMIDI:
+        assert len(hov.shape) == 3, "HOV should have shape (seq_len, num_instruments, 3)"
+        assert hov.shape[2] == 3, f"HOV dimension should have been 3 but was {hov.shape[2]}"
+
+        # Setup metadata
+        midi = PrettyMIDI(resolution=480, initial_tempo=tempo_bpm)
+        midi.time_signature_changes.append(TimeSignature(4, 4, 0))
+        midi.key_signature_changes.append(KeySignature(0, 0))
+
+        # Create a drum track
+        drum_track = Instrument(program=0, is_drum=True, name="Drums")
+
+        # Iterate through each hit (e.g. where the hit matrix is set to 1)
+        steps_per_second = self.config.steps_per_beat * tempo_bpm / 60
+        for step, category in np.argwhere(hov[..., 0]):
+            # Calculate the time from the step number and offset
+            offset = hov[step, category, 1]
+            step_with_offset = step + offset
+            start = step_with_offset / steps_per_second
+            end = start + 1 / steps_per_second  # make duration equal one step
+
+            # Get the note pitch and velocity
+            pitch = int(self.config._category_reverse_lookup[category])
+            velocity = int(hov[step, category, 2] * 127)
+
+            # Append the note
+            drum_track.notes.append(Note(pitch=pitch, velocity=velocity, start=start, end=end))
+
+        # Add the drum track
+        midi.instruments.append(drum_track)
+
+        return midi
