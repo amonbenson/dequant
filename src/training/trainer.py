@@ -3,6 +3,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 from typing import Optional
 from datetime import datetime
 import multiprocessing
@@ -60,7 +61,11 @@ class Trainer:
         logger.info("Training ...")
         self.model.train()
 
-        for encoder_input, decoder_input, decoder_target in self.train_set:
+        # Show a progress bar
+        pbar = tqdm(self.train_set, desc=f"Epoch {self.epoch}", mininterval=0.1)
+
+        # Start training batches
+        for encoder_input, decoder_input, decoder_target in pbar:
             encoder_input = encoder_input.to(self.device, non_blocking=True)
             decoder_input = decoder_input.to(self.device, non_blocking=True)
             decoder_target = decoder_target.to(self.device, non_blocking=True)
@@ -91,6 +96,8 @@ class Trainer:
             # Log learning rate
             current_lr = self.optimizer.param_groups[0]["lr"]
             self.writer.add_scalar("Learning_rate", current_lr, self.global_step)
+
+            pbar.set_postfix(loss=f"{loss.item():.4f}", grad=f"{total_norm:.2f}", lr=f"{current_lr:.2e}")
 
             self.global_step += 1
 
