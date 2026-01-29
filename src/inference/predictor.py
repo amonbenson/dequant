@@ -3,9 +3,9 @@ import torch
 import logging
 from ..model import DequantTransformer, DequantTransformerConfig
 from ..config import CONFIG
-from ..train.checkpoint import Checkpoint
+from ..utils.checkpoint import Checkpoint
 
-logger = logging.getLogger("predict")
+logger = logging.getLogger("predictor")
 
 
 class Predictor:

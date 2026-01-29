@@ -1,6 +1,6 @@
 import numpy as np
-from src.hov.dataset import HOVDataset, HOVEncoderDecoderDataset, HOVDatasetConfig
-from tests.utils import create_dummy_hov, create_dummy_dataset
+from src.data.datasets.hov_dataset import HOVDataset, HOVEncoderDecoderDataset, HOVDatasetConfig
+from tests.data.utils import create_dummy_hov, create_dummy_dataset
 
 
 def test_dumm_hov_generator():

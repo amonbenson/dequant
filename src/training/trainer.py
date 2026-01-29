@@ -4,15 +4,15 @@ import torch
 from torch.utils.data import DataLoader
 from typing import Optional
 from datetime import datetime
-from .checkpoint import Checkpoint
-from ..hov.dataset import HOVEncoderDecoderDataset, HOVDatasetConfig
+from ..utils.checkpoint import Checkpoint
+from ..data.datasets.hov_dataset import HOVEncoderDecoderDataset, HOVDatasetConfig
 from ..model import (
     DequantTransformer as DequantTransformer,
     DequantTransformerConfig as DequantTransformerConfig,
 )
 from ..config import CONFIG
 
-logger = logging.getLogger("train")
+logger = logging.getLogger("training")
 
 
 class Trainer:

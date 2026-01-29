@@ -1,7 +1,7 @@
 from tempfile import TemporaryFile
 import numpy as np
 import mido
-from src.hov import DrumCategory, HOVConverter, HOVConverterConfig
+from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
 
 REDUCED_DRUM_CATEGORIES = [

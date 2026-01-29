@@ -3,21 +3,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Union
 import tyro
-from pretty_midi import PrettyMIDI
-import torch
-from .config import RootConfig, update_config, CONFIG
-from .preprocess import preprocess
-from .train import train
-from .hov import HOVConverter, HOVConverterConfig
-from .predict import Predictor
+from .config import RootConfig, update_config
+from . import cli
 
 logger = logging.getLogger("main")
-
-try:
-    import fluidsynth
-except ImportError as e:
-    if e.msg == "Couldn't find the FluidSynth library.":
-        logger.warning("Fluidsynth library was not found. You will not be able to play midi files.")
 
 
 @dataclass
@@ -72,61 +61,25 @@ def main():
     # Apply the command line configuration
     update_config(args.config)
 
-    # Create a shared midi converter used by multiple commands
-    converter = HOVConverter(
-        HOVConverterConfig(
-            steps_per_beat=CONFIG.model.drums.steps_per_beat,
-            categories=CONFIG.model.drums.categories,
-        )
-    )
-
     # Run the selected action
     match args.command.__class__.__name__:
         case "PreprocessCommand":
-            preprocess()
+            cli.run_preprocess()
         case "TrainCommand":
-            if CONFIG.train.sample_stride % CONFIG.model.drums.steps_per_beat == 0:
-                logger.warning(
-                    f"The parameter data.sample_stride ({CONFIG.data.sample_stride}) is equally divisible by model.drums.steps_per_beat ({CONFIG.model.drums.steps_per_beat}). "
-                    + "This will result in poor model performance, because the model will never receive sequences starting at any other beat than 0."
-                )
-
-            if CONFIG.train.auto_preprocess:
-                preprocess()
-
-            train()
+            cli.run_train()
         case "PlayCommand":
-            # Play a midi file
-            converter.play(args.command.input)
+            cli.run_play(args.command.input)
         case "QuantizeCommand":
-            # Load the input midi file
-            midi = PrettyMIDI(args.command.input)
-            tempo_bpm = converter.extract_tempo(midi)
-
-            # Load the midi file
-            hov = converter.midi_to_hov(midi, tempo_bpm=tempo_bpm)
-
-            hov[..., 1] = 0  # Remove offset data
-            hov[..., 2] = hov[..., 0]  # Set velocity to 100% for each hit
-
-            # Store as a midi file
-            output_midi = converter.hov_to_midi(hov, tempo_bpm=tempo_bpm)
-            output_midi.write(args.command.output)
+            cli.run_quantize(
+                args.command.input,
+                args.command.output,
+            )
         case "DequantizeCommand":
-            # Load the input midi file
-            midi = PrettyMIDI(args.command.input)
-            tempo_bpm = converter.extract_tempo(midi)
-
-            # Load the midi file
-            hov = converter.midi_to_hov(midi, tempo_bpm=tempo_bpm)
-
-            # Predict full HOV matrix from only the hits (index 0)
-            predictor = Predictor(args.command.checkpoint)
-            hov = predictor.predict_sequence(torch.from_numpy(hov[..., 0])).numpy()
-
-            # Store as a midi file
-            output_midi = converter.hov_to_midi(hov, tempo_bpm=tempo_bpm)
-            output_midi.write(args.command.output)
+            cli.run_dequantize(
+                args.command.input,
+                args.command.output,
+                args.command.checkpoint,
+            )
         case _:
             logger.error(f"Unknown command '{args.command}'")
 

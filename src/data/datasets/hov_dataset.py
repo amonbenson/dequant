@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 import logging
 
-logger = logging.getLogger("dataset")
+logger = logging.getLogger("hov_dataset")
 
 
 @dataclass
