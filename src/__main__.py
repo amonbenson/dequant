@@ -1,17 +1,20 @@
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated, Union
 import tyro
 from .config import RootConfig, update_config, CONFIG
 from .preprocess import preprocess
 from .train import train
+from .hov import HOVConverter, HOVConverterConfig
 
 logger = logging.getLogger("main")
 
-
-@dataclass
-class TrainCommand:
-    pass
+try:
+    import fluidsynth
+except ImportError as e:
+    if e.msg == "Couldn't find the FluidSynth library.":
+        logger.warning("Fluidsynth library was not found. You will not be able to play midi files.")
 
 
 @dataclass
@@ -20,11 +23,22 @@ class PreprocessCommand:
 
 
 @dataclass
+class TrainCommand:
+    pass
+
+
+@dataclass
+class PlayCommand:
+    filename: Union[Annotated[Path, tyro.conf.Positional]]
+
+
+@dataclass
 class Args:
     config: RootConfig
     command: Union[
         Annotated[PreprocessCommand, tyro.conf.subcommand("preprocess", prefix_name="")],
         Annotated[TrainCommand, tyro.conf.subcommand("train", prefix_name="")],
+        Annotated[PlayCommand, tyro.conf.subcommand("play", prefix_name="")],
     ]
 
 
@@ -49,6 +63,14 @@ def main():
                 preprocess()
 
             train()
+        case PlayCommand():
+            converter = HOVConverter(
+                HOVConverterConfig(
+                    steps_per_beat=CONFIG.model.drums.steps_per_beat,
+                    categories=CONFIG.model.drums.categories,
+                )
+            )
+            converter.play(args.command.filename)
         case _:
             logger.error(f"Unknown command '{args.command}'")
 

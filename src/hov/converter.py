@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 import logging
 import os
 import traceback
+import simpleaudio as sa
 from .drum_category import DrumCategory, DEFAULT_DRUM_CATEGORIES
+from .dataset import HOVDataset, HOVDatasetConfig
 
 logger = logging.getLogger("hov")
 
@@ -242,3 +244,33 @@ class HOVConverter:
         midi.instruments.append(drum_track)
 
         return midi
+
+    def play(self, data: str | Path | np.ndarray | PrettyMIDI, tempo_bpm: int = 120, block: bool = True):
+        # Read from a file
+        if isinstance(data, (str, Path)):
+            filename = Path(data)
+            if not filename.exists():
+                raise FileNotFoundError(f"Midi/HOV file {filename} does not exist.")
+
+            if filename.suffix in (".mid", ".midi"):
+                # Load a midi file
+                data = PrettyMIDI(filename)
+            else:
+                # Load a dataset directory and play the first sequence element
+                dataset = HOVDataset(HOVDatasetConfig(dir=filename))
+                data = dataset[0]
+
+        # Convert hov to midi object if we got a matrix
+        if not isinstance(data, PrettyMIDI):
+            hov = np.array(data)
+            midi = self.hov_to_midi(hov)
+        else:
+            midi = data
+
+        # Play the file
+        audio = midi.fluidsynth(fs=44100)
+        audio = (audio * 32767).astype(np.int16)  # convert to 16-bit PCM
+
+        player = sa.play_buffer(audio, num_channels=1, bytes_per_sample=2, sample_rate=44100)
+        if block:
+            player.wait_done()
