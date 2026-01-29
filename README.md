@@ -59,7 +59,7 @@ python -m src quantize .data/original.midi .data/quantized.midi
 A quantized MIDI file (obtained either from the command above or from another application) can be dequantized using the following command:
 
 ```bash
-python -m src dequantize .data/checkpoints/cp_<timestamp>.pt .data/quantized.midi .data/dequantized.midi
+python -m src dequantize .data/quantized.midi .data/dequantized.midi .data/checkpoints/cp_<timestamp>.pt
 ```
 
 This will load a previously saved checkpoint and use our model to add back velocity and offset information to the midi data.

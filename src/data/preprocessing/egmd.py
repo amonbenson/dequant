@@ -2,8 +2,8 @@ import logging
 import pandas as pd
 import numpy as np
 from .download import download_file, unzip_file
-from ..data.hov_converter import HOVConverter, HOVConverterConfig
-from ..config import CONFIG
+from ..converters.hov_converter import HOVConverter, HOVConverterConfig
+from ...config import CONFIG
 
 logger = logging.getLogger("egmd")
 

@@ -14,6 +14,5 @@ def run_train():
     if CONFIG.train.auto_preprocess:
         run_preprocess()
 
-    def train():
-        trainer = Trainer()
-        trainer.train()
+    trainer = Trainer()
+    trainer.train()
