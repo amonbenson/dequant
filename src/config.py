@@ -46,7 +46,7 @@ class DrumsConfig:
 class TransformerConfig:
     """Configuration for the transformer architecture."""
 
-    d_model: int = 64  # internal model depth
+    d_model: int = 32  # internal model depth
 
 
 @dataclass
@@ -64,7 +64,7 @@ class TrainConfig:
 
     device: Optional[str] = None  # "cpu", "cuda", "mps"
 
-    learning_rate: float = 1e-4  # optimizer learning rate
+    learning_rate: float = 3e-4  # optimizer learning rate
     num_epochs: int = 1000  # maximum number of epochs to train for
     batch_size: int = 32  # number of samples per batch
 
