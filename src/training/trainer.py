@@ -132,7 +132,7 @@ class Trainer:
                 else:
                     raise e
 
-            logger.info(f"Resuming training from epoch {self.epoch} ...")
+        logger.info(f"Starting training from epoch {self.epoch} ...")
 
         # Train until the specified epoch
         while self.epoch < CONFIG.train.num_epochs:

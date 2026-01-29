@@ -13,7 +13,7 @@ except ImportError as e:
         logger.warning("Fluidsynth library was not found. You will not be able to play midi files.")
 
 
-def run_play(input: Path):
+def run_play(input: Path, sample: int = 0):
     converter = create_converter()
 
     # Read input data
@@ -27,7 +27,7 @@ def run_play(input: Path):
     else:
         # Load a dataset directory and play the first sequence element
         dataset = HOVDataset(HOVDatasetConfig(dir=filename))
-        data = dataset[0]
+        data = dataset[sample]
 
     # Convert hov to midi object if we got a matrix
     if not isinstance(data, PrettyMIDI):
