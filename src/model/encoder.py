@@ -30,7 +30,7 @@ class Encoder(nn.Module):
         # Layer norms
         self.ln1 = nn.LayerNorm(d_model)
         self.ln2 = nn.LayerNorm(d_model)
-        
+
         # Dropout layers
         self.attn_dropout = nn.Dropout(config.dropout)  # on attention weights
         self.resid_dropout1 = nn.Dropout(config.dropout)  # after attention
