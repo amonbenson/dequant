@@ -10,6 +10,7 @@ class DequantTransformerConfig:
     max_seq_len: int = 128
     num_instruments: int = 9
     d_model: int = 128
+    dropout: float = 0.2
 
 
 class DequantTransformer(nn.Module):
@@ -21,14 +22,18 @@ class DequantTransformer(nn.Module):
         d_encoder_input = config.num_instruments * 1
         d_decoder_input = config.num_instruments * 2
         d_model = config.d_model
+        dropout = config.dropout
 
         # Input projections
         self.encoder_input_proj = nn.Linear(d_encoder_input, d_model)
         self.decoder_input_proj = nn.Linear(d_decoder_input, d_model)
 
+        # Dropout after projections
+        self.dropout = nn.Dropout(config.dropout)
+
         # Encoder and decoder blocks
-        self.encoder = Encoder(EncoderConfig(d_model=d_model))
-        self.decoder = Decoder(DecoderConfig(d_model=d_model))
+        self.encoder = Encoder(EncoderConfig(d_model=d_model, dropout=dropout))
+        self.decoder = Decoder(DecoderConfig(d_model=d_model, dropout=dropout))
 
         # Output projection
         self.output_proj = nn.Linear(d_model, d_decoder_input)
@@ -62,8 +67,8 @@ class DequantTransformer(nn.Module):
         decoder_flat = decoder_input.flatten(start_dim=2)
 
         # Project to model dimension
-        encoder_emb = self.encoder_input_proj(encoder_flat)
-        decoder_emb = self.decoder_input_proj(decoder_flat)
+        encoder_emb = self.dropout(self.encoder_input_proj(encoder_flat))
+        decoder_emb = self.dropout(self.decoder_input_proj(decoder_flat))
 
         # Transformer formward pass
         encoder_output: torch.Tensor = self.encoder(encoder_emb)

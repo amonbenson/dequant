@@ -247,7 +247,7 @@ class HOVConverter:
         for step, category in np.argwhere(hov[..., 0]):
             # Calculate the time from the step number and offset
             offset = hov[step, category, 1]
-            step_with_offset = step + offset
+            step_with_offset = max(0, step + offset)  # Prevent negative time on the first step
             start = step_with_offset / steps_per_second
             end = start + 1 / steps_per_second  # make duration equal one step
 

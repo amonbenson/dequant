@@ -2,8 +2,11 @@ import logging
 from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 from typing import Optional
 from datetime import datetime
+import multiprocessing
 from ..utils.checkpoint import Checkpoint
 from ..data.datasets.hov_dataset import HOVEncoderDecoderDataset, HOVDatasetConfig
 from ..model import (
@@ -41,6 +44,7 @@ class Trainer:
                 max_seq_len=CONFIG.model.max_seq_len,
                 num_instruments=CONFIG.model.drums.num_instruments,
                 d_model=CONFIG.model.transformer.d_model,
+                dropout=CONFIG.model.transformer.dropout,
             )
         )
         self.model = self.model.to(self.device)
@@ -49,16 +53,22 @@ class Trainer:
         self.loss_fn = torch.nn.MSELoss()
 
         self.epoch = 0
+        self.global_step = 0
+        self.writer = SummaryWriter()
 
     def train_epoch(self):
         # Training
         logger.info("Training ...")
         self.model.train()
 
-        for encoder_input, decoder_input, decoder_target in self.train_set:
-            encoder_input = encoder_input.to(self.device)
-            decoder_input = decoder_input.to(self.device)
-            decoder_target = decoder_target.to(self.device)
+        # Show a progress bar
+        pbar = tqdm(self.train_set, desc=f"Epoch {self.epoch}", mininterval=0.1)
+
+        # Start training batches
+        for encoder_input, decoder_input, decoder_target in pbar:
+            encoder_input = encoder_input.to(self.device, non_blocking=True)
+            decoder_input = decoder_input.to(self.device, non_blocking=True)
+            decoder_target = decoder_target.to(self.device, non_blocking=True)
 
             # Forward pass
             predictions = self.model(encoder_input, decoder_input)
@@ -71,6 +81,26 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
 
+            # Log training metrics
+            self.writer.add_scalar("Loss/train", loss.item(), self.global_step)
+
+            # Log gradient norms for monitoring training stability
+            total_norm = 0.0
+            for p in self.model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)
+                    total_norm += param_norm.item() ** 2
+            total_norm = total_norm**0.5
+            self.writer.add_scalar("Gradients/norm", total_norm, self.global_step)
+
+            # Log learning rate
+            current_lr = self.optimizer.param_groups[0]["lr"]
+            self.writer.add_scalar("Learning_rate", current_lr, self.global_step)
+
+            pbar.set_postfix(loss=f"{loss.item():.4f}", grad=f"{total_norm:.2f}", lr=f"{current_lr:.2e}")
+
+            self.global_step += 1
+
         # Valiation
         logger.info("Validating ...")
         self.model.eval()
@@ -79,9 +109,9 @@ class Trainer:
 
         with torch.no_grad():
             for encoder_input, decoder_input, decoder_target in self.validation_set:
-                encoder_input = encoder_input.to(self.device)
-                decoder_input = decoder_input.to(self.device)
-                decoder_target = decoder_target.to(self.device)
+                encoder_input = encoder_input.to(self.device, non_blocking=True)
+                decoder_input = decoder_input.to(self.device, non_blocking=True)
+                decoder_target = decoder_target.to(self.device, non_blocking=True)
 
                 predictions = self.model(encoder_input, decoder_input)
 
@@ -89,14 +119,16 @@ class Trainer:
                 total_loss += loss.item()
                 num_batches += 1
 
-        # Update epoch
+        # Calculate and log average validation loss
         avg_loss = total_loss / num_batches
-        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Loss: {avg_loss:.6f}")
-        self.epoch += 1
+        self.writer.add_scalar("Loss/validation", avg_loss, self.epoch)
 
         # Save a checkpoint to the default path
-        if (self.epoch + 1) % CONFIG.train.save_every_n_epochs == 0:
+        if self.epoch % CONFIG.train.save_every_n_epochs == 0:
             self.save_checkpoint()
+
+        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Loss: {avg_loss:.6f}")
+        self.epoch += 1
 
     def train(self):
         # Resume from a previous checkpoint
@@ -109,11 +141,14 @@ class Trainer:
                 else:
                     raise e
 
-            logger.info(f"Resuming training from epoch {self.epoch} ...")
+        logger.info(f"Starting training from epoch {self.epoch} ...")
 
         # Train until the specified epoch
         while self.epoch < CONFIG.train.num_epochs:
             self.train_epoch()
+
+        # Close the tensorboard writer
+        self.writer.close()
 
     @staticmethod
     def create_dataloader(dir: Path):
@@ -124,13 +159,16 @@ class Trainer:
                 dir=dir,
                 seq_len=CONFIG.model.max_seq_len,
                 sample_stride=CONFIG.train.sample_stride,
-                filter_empty=True,
+                filter_empty=False,
             )
         )
         dataloader = DataLoader(
             dataset,
             batch_size=CONFIG.train.batch_size,
             shuffle=CONFIG.train.sample_shuffle,
+            pin_memory=True if torch.cuda.is_available() else False,
+            num_workers=multiprocessing.cpu_count(),  # Adjust based on your CPU cores
+            persistent_workers=True,  # Keep workers alive between epochs
         )
         return dataloader
 
@@ -145,6 +183,7 @@ class Trainer:
             filename,
             config=CONFIG,
             epoch=self.epoch,
+            global_step=self.global_step,
             model=self.model,
             optimizer=self.optimizer,
             loss_fn=self.loss_fn,
@@ -160,7 +199,7 @@ class Trainer:
                 raise FileNotFoundError("No checkpoints were found.")
 
         # Load the checkpoint and apply all parameters
-        self.epoch, self.loss_fn = Checkpoint.load(
+        self.epoch, self.loss_fn, self.global_step = Checkpoint.load(
             filename,
             device=self.device,
             config=CONFIG,

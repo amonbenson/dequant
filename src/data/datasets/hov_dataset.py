@@ -14,7 +14,7 @@ class HOVDatasetConfig:
     dir: Path
     seq_len: int = 128
     sample_stride: int = 1
-    filter_empty: bool = True
+    filter_empty: bool = False
 
     def __post_init__(self):
         if self.sample_stride <= 0:
@@ -26,6 +26,10 @@ class HOVDatasetConfig:
 class HOVDataset(Dataset):
     def __init__(self, config: HOVDatasetConfig, *, data: Optional[np.ndarray] = None):
         self.config = config
+
+        # Warn if filtering is enabled (not implemented for on-the-fly generation)
+        if self.config.filter_empty:
+            logger.warning("filter_empty is enabled but is currently not implemented")
 
         if data is not None:
             # Use provided data
@@ -52,30 +56,20 @@ class HOVDataset(Dataset):
         assert self._data.shape[0] >= self.config.seq_len, f"Not enough data to generate sequences of length {self.config.seq_len}"
         assert self._data.shape[2] == 3, "Expected HOV dimension to be of size 3"
 
-        # Unfold the data into separate chunks
-        expected_num_sequences = (len(self._data) - self.config.seq_len) // self.config.sample_stride + 1
-        logger.info(f"Unfolding raw data of length {len(self._data)} into {expected_num_sequences} sequences ...")
-
-        unfolded = self._data.unfold(0, self.config.seq_len, self.config.sample_stride)
-        self._chunks = unfolded.movedim(-1, 1)  # move the chunk dimension to the start
-
-        # Remove completely empty chunks
-        if self.config.filter_empty:
-            # Check if any hits are set
-            non_empty = self._chunks.any(dim=(1, 2, 3))
-            self._chunks = self._chunks[non_empty]
-
-            n_empty = len(self) - non_empty.sum()
-            if n_empty > 0:
-                logger.info(f"Removed {n_empty}/{len(self)} training sequences because they are completely empty.")
-
-        logger.info(f"Loaded {len(self)} sequences.")
+        # Calculate the number of sequences without actually generating them
+        self._num_sequences = (len(self._data) - self.config.seq_len) // self.config.sample_stride + 1
+        logger.info(f"Dataset initialized with {self._num_sequences} sequences from raw data of length {len(self._data)}")
 
     def __len__(self) -> int:
-        return len(self._chunks)
+        return self._num_sequences
 
     def __getitem__(self, index: int) -> torch.Tensor:
-        return self._chunks[index]
+        # Calculate the start position for this chunk
+        start_idx = index * self.config.sample_stride
+        end_idx = start_idx + self.config.seq_len
+
+        # Extract and return the chunk on-the-fly
+        return self._data[start_idx:end_idx]
 
     @property
     def raw_data(self) -> torch.Tensor:

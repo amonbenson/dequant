@@ -46,14 +46,15 @@ class DrumsConfig:
 class TransformerConfig:
     """Configuration for the transformer architecture."""
 
-    d_model: int = 64  # internal model depth
+    d_model: int = 32  # internal model depth
+    dropout: float = 0.5  # dropout for all layers
 
 
 @dataclass
 class ModelConfig:
     """Configuration for the Dequant model."""
 
-    max_seq_len: int = 512  # maximum number of sequences
+    max_seq_len: int = 256  # maximum number of sequences
     drums: DrumsConfig = field(default_factory=DrumsConfig)  # drum-specific configuration
     transformer: TransformerConfig = field(default_factory=TransformerConfig)  # transformer-specific configuration
 
@@ -65,17 +66,17 @@ class TrainConfig:
     device: Optional[str] = None  # "cpu", "cuda", "mps"
 
     learning_rate: float = 1e-4  # optimizer learning rate
-    num_epochs: int = 100  # maximum number of epochs to train for
-    batch_size: int = 32  # number of samples per batch
+    num_epochs: int = 1000  # maximum number of epochs to train for
+    batch_size: int = 512  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training
-    sample_stride: int = 777  # offset in which sample sequences are taken from the dataset
+    sample_stride: int = 3  # offset in which sample sequences are taken from the dataset
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     resume: bool = True  # resume training from a previously saved checkpoint
     resume_from: Optional[Path] = None  # path to the checkpoint to resume from. If not provided, use the latest
     checkpoint_dir: Path = Path(".data/checkpoints")  # where to store checkpoints
-    save_every_n_epochs: int = 10  # how often to store checkpoints
+    save_every_n_epochs: int = 1  # how often to store checkpoints
 
     # patience: int = 10
 

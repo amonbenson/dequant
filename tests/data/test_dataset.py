@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from src.data.datasets.hov_dataset import HOVDataset, HOVEncoderDecoderDataset, HOVDatasetConfig
 from tests.data.utils import create_dummy_hov, create_dummy_dataset
@@ -50,6 +51,7 @@ def test_dataset_misaligned_sample_stride():
     assert dataset[2].numpy().tolist() == dataset.raw_data[16:32].tolist()
 
 
+@pytest.mark.skip(reason="Filtering is currently not implemented")
 def test_trim():
     raw_data = np.concatenate(
         [

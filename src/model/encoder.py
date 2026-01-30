@@ -7,6 +7,7 @@ from dataclasses import dataclass
 @dataclass
 class EncoderConfig:
     d_model: int
+    dropout: float = 0.2
 
 
 class Encoder(nn.Module):
@@ -30,6 +31,11 @@ class Encoder(nn.Module):
         self.ln1 = nn.LayerNorm(d_model)
         self.ln2 = nn.LayerNorm(d_model)
 
+        # Dropout layers
+        self.attn_dropout = nn.Dropout(config.dropout)  # on attention weights
+        self.resid_dropout1 = nn.Dropout(config.dropout)  # after attention
+        self.resid_dropout2 = nn.Dropout(config.dropout)  # after FFN
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Bidirectional self-attention
         residual = x
@@ -40,12 +46,13 @@ class Encoder(nn.Module):
 
         attn: torch.Tensor = (q @ k.transpose(-2, -1)) / np.sqrt(self.config.d_model)
         attn = torch.softmax(attn, dim=-1)
+        attn = self.attn_dropout(attn)
 
         x = attn @ v
         x = self.attn_out(x)
-        x = residual + x
+        x = residual + self.resid_dropout1(x)
 
         # Feed-forward
-        x = x + self.ffn(self.ln2(x))
+        x = x + self.resid_dropout2(self.ffn(self.ln2(x)))
 
         return x

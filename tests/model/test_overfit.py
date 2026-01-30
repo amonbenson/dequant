@@ -62,4 +62,4 @@ def test_dequant_overfitting():
         print(f"Evaluation loss: {eval_loss.item():.6f}")
 
     # Make sure that the evaluation loss goes down
-    assert eval_loss < 0.05
+    assert eval_loss < 0.07

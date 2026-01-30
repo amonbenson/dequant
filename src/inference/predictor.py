@@ -16,6 +16,7 @@ class Predictor:
                 max_seq_len=CONFIG.model.max_seq_len,
                 num_instruments=CONFIG.model.drums.num_instruments,
                 d_model=CONFIG.model.transformer.d_model,
+                dropout=CONFIG.model.transformer.dropout,
             )
         )
         Checkpoint.load(
@@ -51,10 +52,15 @@ class Predictor:
                 # Run the model to get a full sequence prediction
                 prediction = self.model(encoder_input, decoder_input)[0]
 
-                # Add just the latest prediced timestep to the generated sequence
-                generated = torch.cat([generated, prediction[-1:, ...]], dim=0)
+                # Extract just the latest predicted timestep and mask it by the hits array
+                # (If the transformer generated offset/velocity data for instruments that were
+                # not playing, this will clear those values from feeding back into the decoder_input
+                # on the next step)
+                prediction_masked = prediction[-1:, :, :] * hits[step : step + 1, :].unsqueeze(2)
+
+                # Append the generated step
+                generated = torch.cat([generated, prediction_masked], dim=0)
 
             # Concat the sequence with the hits to get the full HOV matrix
-            print(hits.shape, generated.shape)
             hov = torch.cat([hits.unsqueeze(2), generated[1:, :]], dim=2)
             return hov
