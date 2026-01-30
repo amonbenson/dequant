@@ -64,6 +64,14 @@ python -m src dequantize .data/quantized.midi .data/dequantized.midi .data/check
 
 This will load a previously saved checkpoint and use our model to add back velocity and offset information to the midi data.
 
+## Tensorboard
+
+When training, logs will be written to the `/runs/` directory. You can use tensorboard in a separate terminal to monitor the training progress:
+
+```bash
+tensorboard --logdir runs
+```
+
 ## Configuration
 
 To see a list of available commands and configuration options, type:
