@@ -24,6 +24,8 @@ class DequantTransformer(nn.Module):
         d_model = config.d_model
         dropout = config.dropout
 
+        self.pos_proj = nn.Linear(4, d_model)
+
         # Input projections
         self.encoder_input_proj = nn.Linear(d_encoder_input, d_model)
         self.decoder_input_proj = nn.Linear(d_decoder_input, d_model)
@@ -41,11 +43,7 @@ class DequantTransformer(nn.Module):
         self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
 
-    def forward(
-        self,
-        encoder_input: torch.Tensor,
-        decoder_input: torch.Tensor,
-    ) -> torch.Tensor:
+    def forward(self, encoder_input: torch.Tensor, decoder_input: torch.Tensor, pos_enc: torch.Tensor) -> torch.Tensor:
         # Validate inputs
         assert encoder_input.dtype == torch.float32, f"encoder_input must be float32, not {encoder_input.dtype}"
         assert decoder_input.dtype == torch.float32, f"decoder_input must be float32, not {encoder_input.dtype}"
@@ -61,6 +59,10 @@ class DequantTransformer(nn.Module):
         batch_size, seq_len, num_instruments = encoder_input.shape
         assert seq_len <= self.config.max_seq_len, "max_seq_len exceeded."
         assert num_instruments == self.config.num_instruments, f"received num_instruments ({num_instruments}) is different from the configuration ({self.config.num_instruments})"
+        # PE
+        assert pos_enc.dtype == torch.float32
+        assert pos_enc.shape[:2] == (batch_size, seq_len)
+        assert pos_enc.shape[2] == 4
 
         # Flatten instrument dimension
         encoder_flat = encoder_input.flatten(start_dim=2)  # this is a nop, but we might add other info later
@@ -70,7 +72,11 @@ class DequantTransformer(nn.Module):
         encoder_emb = self.dropout(self.encoder_input_proj(encoder_flat))
         decoder_emb = self.dropout(self.decoder_input_proj(decoder_flat))
 
-        # Transformer formward pass
+        pos_emb = self.pos_proj(pos_enc)
+        encoder_emb = encoder_emb + pos_emb
+        decoder_emb = decoder_emb + pos_emb
+
+        # Transformer forward pass
         encoder_output: torch.Tensor = self.encoder(encoder_emb)
         y: torch.Tensor = self.decoder(decoder_emb, encoder_output)
 

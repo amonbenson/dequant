@@ -65,13 +65,14 @@ class Trainer:
         pbar = tqdm(self.train_set, desc=f"Epoch {self.epoch}", mininterval=0.1)
 
         # Start training batches
-        for encoder_input, decoder_input, decoder_target in pbar:
+        for encoder_input, decoder_input, decoder_target, pos_enc in pbar:
             encoder_input = encoder_input.to(self.device, non_blocking=True)
             decoder_input = decoder_input.to(self.device, non_blocking=True)
             decoder_target = decoder_target.to(self.device, non_blocking=True)
+            pos_enc = pos_enc.to(self.device, non_blocking=True)
 
             # Forward pass
-            predictions = self.model(encoder_input, decoder_input)
+            predictions = self.model(encoder_input, decoder_input, pos_enc)
 
             # Compute loss
             loss: torch.Tensor = self.loss_fn(predictions, decoder_target)
@@ -101,19 +102,20 @@ class Trainer:
 
             self.global_step += 1
 
-        # Valiation
+        # Validation
         logger.info("Validating ...")
         self.model.eval()
         total_loss = 0
         num_batches = 0
 
         with torch.no_grad():
-            for encoder_input, decoder_input, decoder_target in self.validation_set:
+            for encoder_input, decoder_input, decoder_target, pos_enc in self.validation_set:
                 encoder_input = encoder_input.to(self.device, non_blocking=True)
                 decoder_input = decoder_input.to(self.device, non_blocking=True)
                 decoder_target = decoder_target.to(self.device, non_blocking=True)
+                pos_enc = pos_enc.to(self.device, non_blocking=True)
 
-                predictions = self.model(encoder_input, decoder_input)
+                predictions = self.model(encoder_input, decoder_input, pos_enc)
 
                 loss = self.loss_fn(predictions, decoder_target)
                 total_loss += loss.item()

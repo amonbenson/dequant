@@ -40,7 +40,7 @@ def preprocess_egmd():
     filter_count = len(df) - len(df_filt)
     logger.debug(f"Removed {filter_count} files due to mismatching time signature")
 
-    # split in train, test, validaton
+    # split in train, test, validation
     df_splits = {
         "train": df_filt[df_filt["split"] == "train"],
         "test": df_filt[df_filt["split"] == "test"],
@@ -70,11 +70,24 @@ def preprocess_egmd():
 
         # Run the parallel preprocesser
         logger.info(f"Extracing split '{split_name}' ...")
-        matrices = converter.midi_to_hov_batch(
+        results = converter.midi_to_hov_batch(
             file_infos,
             n_workers=CONFIG.data.num_workers,
         )
 
+        hovs = []
+        pos_en = []
+        for item in results:
+            if item is None:
+                continue
+            hov, pos = item
+            hovs.append(hov)
+            pos_en.append(pos)
+
         # Store the matrices as .npz
         logger.info(f"Saving '{data_filename}' ...")
-        np.savez_compressed(data_filename, data=matrices)
+        np.savez_compressed(
+            data_filename,
+            data=np.array(hovs, dtype=object),
+            pos_en=np.array(pos_en, dtype=object),
+        )

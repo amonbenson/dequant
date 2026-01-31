@@ -34,10 +34,38 @@ def create_dummy_dataset(
         num_steps=num_steps,
         num_instruments=num_instruments,
     )
+    pos_enc = create_dummy_pos_enc(num_steps=num_steps)
+
     config = HOVDatasetConfig(
         dir="dummy",
         seq_len=seq_len,
         sample_stride=sample_stride,
         filter_empty=filter_empty,
     )
-    return HOVDataset(config, data=data)
+    return HOVDataset(config, data=data, pos_enc=pos_enc)
+
+
+# for pipeline tests
+def create_dummy_pos_enc(num_steps: int, *, seed: int = 24601) -> np.ndarray:
+    rng = np.random.default_rng(seed + 1)
+    return rng.uniform(low=-1.0, high=1.0, size=(num_steps, 4)).astype(np.float32)
+
+
+def compute_pos_enc(n_steps, steps_per_bar):
+    step_idx = np.arange(n_steps)
+    pos_in_bar = step_idx % steps_per_bar
+    bar_idx = step_idx // steps_per_bar
+
+    total_bars = max(1, n_steps // steps_per_bar)
+    beat_phase = 2 * np.pi * pos_in_bar / steps_per_bar
+    bar_phase = 2 * np.pi * bar_idx / total_bars
+
+    return np.stack(
+        [
+            np.sin(beat_phase),
+            np.cos(beat_phase),
+            np.sin(bar_phase),
+            np.cos(bar_phase),
+        ],
+        axis=-1,
+    ).astype(np.float32)
