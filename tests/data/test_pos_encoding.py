@@ -1,5 +1,4 @@
 import numpy as np
-from src.data import HOVConverterConfig
 
 def test_pos_encoding_range():
     f = np.load(".data/dataset/test/egmd.npz", allow_pickle=True)

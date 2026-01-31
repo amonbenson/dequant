@@ -125,7 +125,6 @@ class HOVConverter:
         step_idx = np.arange(n_grid_onsets)
         pos_in_bar = step_idx % steps_per_bar  # 0..15 repeating
         bar_idx = step_idx // steps_per_bar
-        beat_idx = (step_idx // self.config.steps_per_beat) % 4 #within steps per beat, 0-3 -> beat 0, 4-7 -> beat 2 etc.
         total_bars = max(1, n_grid_onsets // steps_per_bar) #guardrail against division by zero
 
         bar_phase = 2 * np.pi * bar_idx / total_bars  # one cycle over clip
