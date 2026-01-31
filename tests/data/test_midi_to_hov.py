@@ -65,7 +65,7 @@ def test_pattern_length():
     hov1, pos1 = create_hov(seq1, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
     hov2, pos2 = create_hov(seq2, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
     hov3, pos3 = create_hov(seq3, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
-    hov4, pos4  = create_hov(seq4, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
+    hov4, pos4 = create_hov(seq4, 120, HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES))
 
     assert len(hov1) == 16
     assert len(hov2) == 16

@@ -28,10 +28,11 @@ def test_dataset_aligned_sample_stride():
     assert hov1.numpy().tolist() == dataset.raw_data[8:24].tolist()
     assert hov2.numpy().tolist() == dataset.raw_data[16:32].tolist()
 
-    #pos_encoding alignment
+    # pos_encoding alignment
     assert pos0.numpy().tolist() == dataset.pos_enc[0:16].tolist()
     assert pos1.numpy().tolist() == dataset.pos_enc[8:24].tolist()
     assert pos2.numpy().tolist() == dataset.pos_enc[16:32].tolist()
+
 
 def test_dataset_misaligned_sample_stride():
     dataset = create_dummy_dataset(
@@ -111,7 +112,7 @@ def test_encoder_decoder():
             filter_empty=False,
         ),
         data=raw_data,
-        pos_enc=pos_enc
+        pos_enc=pos_enc,
     )
 
     assert dataset.start_token().tolist() == [[0.0, 0.0]] * 9
@@ -133,5 +134,3 @@ def test_encoder_decoder():
     assert decoder_input.tolist() == [[[0.0, 0.0]] * 9, *raw_data[8:23, :, 1:3].tolist()]
     assert decoder_target.tolist() == raw_data[8:24, :, 1:3].tolist()
     assert pos.tolist() == pos_enc[8:24].tolist()
-
-

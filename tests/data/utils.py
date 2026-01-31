@@ -44,12 +44,9 @@ def create_dummy_dataset(
     )
     return HOVDataset(config, data=data, pos_enc=pos_enc)
 
-#for pipeline tests
-def create_dummy_pos_enc(
-        num_steps: int,
-        *,
-        seed: int = 24601
-) -> np.ndarray:
+
+# for pipeline tests
+def create_dummy_pos_enc(num_steps: int, *, seed: int = 24601) -> np.ndarray:
     rng = np.random.default_rng(seed + 1)
     return rng.uniform(low=-1.0, high=1.0, size=(num_steps, 4)).astype(np.float32)
 
@@ -72,5 +69,3 @@ def compute_pos_enc(n_steps, steps_per_bar):
         ],
         axis=-1,
     ).astype(np.float32)
-
-

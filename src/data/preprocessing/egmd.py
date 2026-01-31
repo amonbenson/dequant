@@ -88,6 +88,6 @@ def preprocess_egmd():
         logger.info(f"Saving '{data_filename}' ...")
         np.savez_compressed(
             data_filename,
-            data = np.array(hovs, dtype=object),
-            pos_en = np.array(pos_en, dtype=object),
+            data=np.array(hovs, dtype=object),
+            pos_en=np.array(pos_en, dtype=object),
         )

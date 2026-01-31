@@ -66,7 +66,7 @@ class TrainConfig:
     device: Optional[str] = None  # "cpu", "cuda", "mps"
 
     learning_rate: float = 1e-4  # optimizer learning rate
-    num_epochs: int = 1000  # maximum number of epochs to train for
+    num_epochs: int = 100  # # maximum number of epochs to train for
     batch_size: int = 512  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training

@@ -49,7 +49,7 @@ class HOVDataset(Dataset):
             for filename in npz_files:
                 with np.load(filename, allow_pickle=True) as f:
                     arrays.append(f["data"])
-                    pos_key = "pos_enc" if "pos_enc" in f.files else "pos_en" #TODO: change later for 1
+                    pos_key = "pos_enc" if "pos_enc" in f.files else "pos_en"  # TODO: change later for 1
                     pos_enc_arrays.append(f[pos_key])
 
             # Concatenate twice: 1. stich each file together, 2. stich each sequence within each file together
@@ -57,9 +57,9 @@ class HOVDataset(Dataset):
             concatenated = np.concatenate(concatenated, axis=0)
             self._data = torch.from_numpy(concatenated).to(torch.float32)
 
-            #concatenate for pos_enc too
+            # concatenate for pos_enc too
             pos_concat = np.concatenate(pos_enc_arrays, axis=0)
-            pos_concat = np.concatenate(pos_concat, axis=0) #(total_seq*T, 4)
+            pos_concat = np.concatenate(pos_concat, axis=0)  # (total_seq*T, 4)
             self._pos_enc = torch.from_numpy(pos_concat).float()
 
         # Validate the data shape (N, instruments, hov=3)
@@ -90,6 +90,7 @@ class HOVDataset(Dataset):
     @property
     def pos_enc(self) -> torch.Tensor:
         return self._pos_enc
+
 
 class HOVEncoderDecoderDataset(HOVDataset):
     def __getitem__(

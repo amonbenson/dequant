@@ -1,6 +1,7 @@
 import numpy as np
 from tests.data.utils import compute_pos_enc
 
+
 def test_dummy_pos_encoding_properties():
     T = 64
     steps_per_bar = 16
@@ -20,5 +21,3 @@ def test_dummy_pos_encoding_properties():
     # bar is constant within the same bar window
     assert np.allclose(pos[0:16, 2:4], pos[0, 2:4], atol=1e-6)
     assert np.allclose(pos[16:32, 2:4], pos[16, 2:4], atol=1e-6)
-
-

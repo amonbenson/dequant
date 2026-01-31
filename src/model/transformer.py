@@ -43,12 +43,7 @@ class DequantTransformer(nn.Module):
         self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
 
-    def forward(
-        self,
-        encoder_input: torch.Tensor,
-        decoder_input: torch.Tensor,
-        pos_enc: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, encoder_input: torch.Tensor, decoder_input: torch.Tensor, pos_enc: torch.Tensor) -> torch.Tensor:
         # Validate inputs
         assert encoder_input.dtype == torch.float32, f"encoder_input must be float32, not {encoder_input.dtype}"
         assert decoder_input.dtype == torch.float32, f"decoder_input must be float32, not {encoder_input.dtype}"

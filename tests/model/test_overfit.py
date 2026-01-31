@@ -28,7 +28,7 @@ def test_dequant_overfitting():
             ],
             dtype=np.float32,
         ),
-        pos_enc = pos_enc,
+        pos_enc=pos_enc,
     )
     train_loader = DataLoader(
         dataset,
