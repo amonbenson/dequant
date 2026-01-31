@@ -34,10 +34,20 @@ def create_dummy_dataset(
         num_steps=num_steps,
         num_instruments=num_instruments,
     )
+    pos_enc = create_dummy_pos_enc(num_steps=num_steps)
+
     config = HOVDatasetConfig(
         dir="dummy",
         seq_len=seq_len,
         sample_stride=sample_stride,
         filter_empty=filter_empty,
     )
-    return HOVDataset(config, data=data)
+    return HOVDataset(config, data=data, pos_enc=pos_enc)
+
+def create_dummy_pos_enc(
+        num_steps: int,
+        *,
+        seed: int = 24601
+) -> np.ndarray:
+    rng = np.random.default_rng(seed + 1)
+    return rng.uniform(low=-1.0, high=1.0, size=(num_steps, 4)).astype(np.float32)

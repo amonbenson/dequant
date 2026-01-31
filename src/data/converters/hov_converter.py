@@ -2,7 +2,7 @@
 Preprocessing module for MIDI drum files
 Optimized with parallel processing and vectorized operations
 """
-
+from __future__ import annotations
 import numpy as np
 from pathlib import Path
 from pretty_midi import PrettyMIDI, Instrument, Note, TimeSignature, KeySignature
@@ -26,7 +26,7 @@ class HOVConverterConfig:
     categories: list[DrumCategory] = field(default_factory=DEFAULT_DRUM_CATEGORIES)
     _category_lookup: np.ndarray = field(init=False)
     _category_reverse_lookup: np.ndarray = field(init=False)
-
+    #bar_period: int = 8
     def __post_init__(self):
         # Initialize the category lookup table
         # Maps pitch -> category id or -1 if the note has no category
@@ -109,7 +109,7 @@ class HOVConverter:
         bps = tempo_bpm / 60.0  # beats per second
         steps_per_bar = self.config.steps_per_beat * 4  # ONLY FOR 4/4 TIME SIGNATURE! need to change this if we allow other signatures
         steps_ps = bps * self.config.steps_per_beat  # steps per second
-        step = 1.0 / steps_ps
+        step = 1.0 / steps_ps #duration of one grid step in seconds
 
         # get vector / grid length for binary Matrix
         # We add +2 to the last onset, because it might get shifted one extra step if its
@@ -120,6 +120,23 @@ class HOVConverter:
         # extend n_grid_onsets to a full number of bars (15 -> 16, 16 -> 16, 17 -> 32, ...)
         if n_grid_onsets % steps_per_bar != 0:
             n_grid_onsets += steps_per_bar - n_grid_onsets % steps_per_bar
+
+        #encode positions as pos_in_bar + bar_id (progress through the clip)
+        step_idx = np.arange(n_grid_onsets)
+        pos_in_bar = step_idx % steps_per_bar  # 0..15 repeating
+        bar_idx = step_idx // steps_per_bar
+        beat_idx = (step_idx // self.config.steps_per_beat) % 4 #within steps per beat, 0-3 -> beat 0, 4-7 -> beat 2 etc.
+        total_bars = max(1, n_grid_onsets // steps_per_bar) #guardrail against division by zero
+
+        bar_phase = 2 * np.pi * bar_idx / total_bars  # one cycle over clip
+        beat_phase = 2 * np.pi * pos_in_bar / steps_per_bar
+
+        beat_sin = np.sin(beat_phase).astype(np.float32)
+        beat_cos = np.cos(beat_phase).astype(np.float32)
+        bar_sin = np.sin(bar_phase).astype(np.float32)
+        bar_cos = np.cos(bar_phase).astype(np.float32)
+
+        pos_enc = np.stack([beat_sin, beat_cos, bar_sin, bar_cos], axis=-1) #shape: (T, 4)
 
         # snap to grid
         nearest_idc = np.rint(onsets * steps_ps).astype(np.int32)  # get snapped onsets as grid indices
@@ -173,7 +190,7 @@ class HOVConverter:
         # Stack matrices (fix for np.concat bug)
         matrices = np.stack([onset_grid, offset_grid, vel_grid], axis=-1)
 
-        return matrices
+        return matrices, pos_enc
 
     def midi_to_hov_batch(self, file_infos: FileInfos, n_workers: int = 0):
         """
@@ -214,7 +231,7 @@ class HOVConverter:
                 except Exception as e:
                     logger.error(f"Error processing file at index {idx}: {e}")
                     traceback.print_exc()
-                    data.append((idx, None))
+                    data.append((idx, (None, None))) #as now HOVConverter returns tuple of (hov, pe)
 
         # Sort by original index to maintain order
         data.sort(key=lambda x: x[0])

@@ -7,6 +7,8 @@ from src.data import HOVEncoderDecoderDataset, HOVDatasetConfig
 
 
 def test_dequant_overfitting():
+    pos_enc = np.zeros((8, 4), dtype=np.float32)
+
     dataset = HOVEncoderDecoderDataset(
         HOVDatasetConfig(
             dir="dummy",
@@ -26,6 +28,7 @@ def test_dequant_overfitting():
             ],
             dtype=np.float32,
         ),
+        pos_enc = pos_enc,
     )
     train_loader = DataLoader(
         dataset,
@@ -39,8 +42,8 @@ def test_dequant_overfitting():
     criterion = nn.MSELoss()
 
     for epoch in range(300):
-        for _batch_idx, (encoder_input, decoder_input, decoder_target) in enumerate(train_loader):
-            output: torch.Tensor = model(encoder_input, decoder_input)
+        for _batch_idx, (encoder_input, decoder_input, decoder_target, pos_enc) in enumerate(train_loader):
+            output: torch.Tensor = model(encoder_input, decoder_input, pos_enc)
             loss = criterion(output, decoder_target)
 
             optimizer.zero_grad()
@@ -57,6 +60,7 @@ def test_dequant_overfitting():
         prediction = model.forward(
             encoder_input[0].unsqueeze(0),
             decoder_input[0].unsqueeze(0),
+            pos_enc[0].unsqueeze(0),
         )[0].detach()
         eval_loss = criterion(prediction, decoder_target[0])
         print(f"Evaluation loss: {eval_loss.item():.6f}")
