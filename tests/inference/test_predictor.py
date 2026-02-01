@@ -9,10 +9,6 @@ def create_dummy_predictor(model_config: ModelConfig = ModelConfig()):
     return predictor
 
 
-def mock_model_fn(encoder_input: torch.Tensor, decoder_input: torch.Tensor, pos_enc: torch.Tensor) -> torch.Tensor:
-    result = torch.zeros_like(decoder_input)
-
-
 @pytest.mark.parametrize("seq_len", (5, 200, 2000))
 def test_prediction_no_uninitialized_values(seq_len):
     predictor = create_dummy_predictor()
