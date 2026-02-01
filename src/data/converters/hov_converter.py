@@ -74,6 +74,17 @@ class HOVConverter:
 
         return float(tempi[0])
 
+    def positional_encoding(self, bar_idx: np.ndarray, pos_in_bar: np.ndarray, total_bars: int):
+        bar_phase = 2 * np.pi * bar_idx / total_bars  # one cycle over clip
+        beat_phase = 2 * np.pi * pos_in_bar / (self.config.steps_per_beat * 4)
+
+        beat_sin = np.sin(beat_phase).astype(np.float32)
+        beat_cos = np.cos(beat_phase).astype(np.float32)
+        bar_sin = np.sin(bar_phase).astype(np.float32)
+        bar_cos = np.cos(bar_phase).astype(np.float32)
+
+        return np.stack([beat_sin, beat_cos, bar_sin, bar_cos], axis=-1)  # shape: (T, 4)
+
     def midi_to_hov(self, midi: Path | PrettyMIDI, tempo_bpm: int = None):
         midi_data = self._as_pretty_midi(midi)
 
@@ -129,15 +140,7 @@ class HOVConverter:
         bar_idx = step_idx // steps_per_bar
         total_bars = max(1, n_grid_onsets // steps_per_bar)  # guardrail against division by zero
 
-        bar_phase = 2 * np.pi * bar_idx / total_bars  # one cycle over clip
-        beat_phase = 2 * np.pi * pos_in_bar / steps_per_bar
-
-        beat_sin = np.sin(beat_phase).astype(np.float32)
-        beat_cos = np.cos(beat_phase).astype(np.float32)
-        bar_sin = np.sin(bar_phase).astype(np.float32)
-        bar_cos = np.cos(bar_phase).astype(np.float32)
-
-        pos_enc = np.stack([beat_sin, beat_cos, bar_sin, bar_cos], axis=-1)  # shape: (T, 4)
+        pos_enc = self.positional_encoding(bar_idx, pos_in_bar, total_bars)
 
         # snap to grid
         nearest_idc = np.rint(onsets * steps_ps).astype(np.int32)  # get snapped onsets as grid indices

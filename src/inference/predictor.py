@@ -1,66 +1,134 @@
 from pathlib import Path
+from dataclasses import dataclass
 import torch
+import numpy as np
 import logging
+from ..data.converters.hov_converter import HOVConverter, HOVConverterConfig
 from ..model import DequantTransformer, DequantTransformerConfig
-from ..config import CONFIG
+from ..config import ModelConfig
 from ..utils.checkpoint import Checkpoint
 
 logger = logging.getLogger("predictor")
 
 
+@dataclass
+class PredictorConfig:
+    checkpoint: Path
+    model: ModelConfig
+
+
 class Predictor:
-    def __init__(self, checkpoint: Path):
+    def __init__(self, config: PredictorConfig):
+        self.config = config
+
         # Create model from a stored checkpoint
         self.model = DequantTransformer(
             DequantTransformerConfig(
-                max_seq_len=CONFIG.model.max_seq_len,
-                num_instruments=CONFIG.model.drums.num_instruments,
-                d_model=CONFIG.model.transformer.d_model,
-                dropout=CONFIG.model.transformer.dropout,
+                max_seq_len=self.config.model.max_seq_len,
+                num_instruments=self.config.model.drums.num_instruments,
+                d_model=self.config.model.transformer.d_model,
+                dropout=self.config.model.transformer.dropout,
             )
         )
-        Checkpoint.load(
-            checkpoint,
-            device="cpu",
-            config=CONFIG,
-            model=self.model,
+
+        # Load checkpoint. For testing, we might not provide a checkpoint, so we just skip this
+        if config.checkpoint is not None:
+            Checkpoint.load(
+                self.config.checkpoint,
+                device="cpu",
+                config=None,
+                model=self.model,
+            )
+
+        self.converter = HOVConverter(
+            HOVConverterConfig(
+                steps_per_beat=self.config.model.drums.steps_per_beat,
+                categories=self.config.model.drums.categories,
+            )
         )
 
-    def predict_sequence(self, hits: torch.Tensor):
+        self._max_seq_len = self.config.model.max_seq_len
+        self._num_instruments = self.config.model.drums.num_instruments
+
+        self._sequence = torch.zeros((self._max_seq_len, self._num_instruments, 3))
+        self._pos_enc = torch.empty((self._max_seq_len, 4))
+
+        self._playhead_position = 0
+
+        self.reset()
+
+    def reset(self):
+        # Reset position and clear the sequence
+        self._playhead_position = 0
+        self._sequence = torch.zeros((self._max_seq_len, self._num_instruments, 3))
+        self._update_pos_enc()
+
+    def _update_pos_enc(self):
+        # Generate positional encoding for the whole sequence
+        step_idx = np.arange(0, len(self._sequence))
+        pos_in_bar = step_idx % self.config.model.drums.steps_per_beat
+        bar_idx = step_idx // self.config.model.drums.steps_per_beat
+
+        self._pos_enc = torch.from_numpy(self.converter.positional_encoding(bar_idx, pos_in_bar, self._max_seq_len))
+
+    def process_step(self, step_hits: torch.Tensor):
         with torch.no_grad():
-            seq_len, num_instruments = hits.shape
-            max_len = self.model.config.max_seq_len
+            # If the playhead reaches the end of the sequence, double its capacity
+            if self._playhead_position + 2 >= len(self._sequence):
+                self._sequence = torch.cat([self._sequence, torch.empty_like(self._sequence)], dim=0)
+                self._update_pos_enc()
 
-            assert num_instruments == self.model.config.num_instruments, "Incompatible number of instruments"
+            # Calculate the sequence start and end index that can be handled by the model. The start position
+            # will start of as 0, but increase once we reach max_seq_len
+            step_end = self._playhead_position
+            step_start = max(0, step_end - self.config.model.max_seq_len + 1)
 
-            if seq_len > max_len:
-                logger.warning(f"Sequence length ({seq_len}) is higher than the maximum ({max_len}). Some context will be dropped.")
+            # Decoder input will be a concatenation of the start token and
+            default_ov = torch.zeros((self._num_instruments, 2))
+            decoder_input = torch.cat(
+                [
+                    default_ov.unsqueeze(0),  # Start token
+                    self._sequence[step_start:step_end, :, 1:3],  # Use OV-components (without hits)
+                ],
+                dim=0,
+            )
 
-            # Use all zeros as the start roken
-            generated = torch.zeros((1, num_instruments, 2))
+            # Store the hits for the new step
+            self._sequence[step_end, :, 0] = step_hits
 
-            # Generate the sequence step-by-step
-            for step in range(len(hits)):
-                # Truncate encoder input
-                encoder_start = max(0, step + 1 - max_len)
-                encoder_input = hits[encoder_start : step + 1, :].unsqueeze(0)
+            # Cut out the current sequence area from the hits and positional encoding
+            encoder_input = self._sequence[step_start : step_end + 1, :, 0]  # Hits only
+            pos_enc_input = self._pos_enc[step_start : step_end + 1]
 
-                # Truncate decoder input
-                decoder_start = max(0, generated.shape[0] - max_len)
-                decoder_input = generated[decoder_start:, :].unsqueeze(0)
+            # Run the model to get a full sequence prediction
+            prediction = self.model(
+                encoder_input.unsqueeze(0),
+                decoder_input.unsqueeze(0),
+                pos_enc_input.unsqueeze(0),
+            )[0]
 
-                # Run the model to get a full sequence prediction
-                prediction = self.model(encoder_input, decoder_input)[0]
+            # Store the OV component of last predicted timestep into the generated sequence
+            self._sequence[step_end, :, 1:3] = torch.where(
+                step_hits.unsqueeze(-1) > 0.5,  # If there was a hit
+                prediction[-1],  # Then store the predicted OV-values
+                default_ov,  # Else, store the default OV (zeros)
+            )
 
-                # Extract just the latest predicted timestep and mask it by the hits array
-                # (If the transformer generated offset/velocity data for instruments that were
-                # not playing, this will clear those values from feeding back into the decoder_input
-                # on the next step)
-                prediction_masked = prediction[-1:, :, :] * hits[step : step + 1, :].unsqueeze(2)
+            # Update the position
+            self._playhead_position += 1
 
-                # Append the generated step
-                generated = torch.cat([generated, prediction_masked], dim=0)
+    def process_sequence(self, hits: torch.Tensor):
+        logger.info(f"Predicting {len(hits)} steps ...")
 
-            # Concat the sequence with the hits to get the full HOV matrix
-            hov = torch.cat([hits.unsqueeze(2), generated[1:, :]], dim=2)
-            return hov
+        # Reset the current time
+        self.reset()
+
+        # Start processing each step
+        for step_hits in hits:
+            self.process_step(step_hits)
+
+        # Return the full generated sequence
+        return self.get_generated_sequence()
+
+    def get_generated_sequence(self) -> torch.Tensor:
+        return self._sequence[: self._playhead_position]

@@ -29,12 +29,14 @@ class Checkpoint:
         )
 
     @staticmethod
-    def load(filename: Path, *, device: torch.device | str, config: RootConfig, model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None) -> tuple[int, nn.Module, int]:
+    def load(
+        filename: Path, *, device: torch.device | str, config: Optional[RootConfig], model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None
+    ) -> tuple[int, nn.Module, int]:
         logger.info(f"Loading checkpoint from {filename} ...")
         checkpoint = torch.load(filename, map_location=device, weights_only=False)
 
         # Validate the checkpoint config
-        if checkpoint["config"] != asdict(config):
+        if config is not None and checkpoint["config"] != asdict(config):
             logger.warning("Loading checkpoint from a different configuration!")
 
         # Load all weights and data
