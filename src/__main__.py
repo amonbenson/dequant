@@ -45,6 +45,11 @@ class DequantizeCommand:
 
 
 @dataclass
+class AppCommand:
+    pass
+
+
+@dataclass
 class Args:
     config: RootConfig
     command: Union[
@@ -53,6 +58,7 @@ class Args:
         Annotated[PlayCommand, tyro.conf.subcommand("play", prefix_name=False)],
         Annotated[QuantizeCommand, tyro.conf.subcommand("quantize", prefix_name=False)],
         Annotated[DequantizeCommand, tyro.conf.subcommand("dequantize", prefix_name=False)],
+        Annotated[AppCommand, tyro.conf.subcommand("app", prefix_name=False)],
     ]
 
 
@@ -63,27 +69,29 @@ def main():
     update_config(args.config)
 
     # Run the selected action
-    match args.command.__class__.__name__:
-        case "PreprocessCommand":
+    match args.command:
+        case PreprocessCommand():
             cli.run_preprocess()
-        case "TrainCommand":
+        case TrainCommand():
             cli.run_train()
-        case "PlayCommand":
+        case PlayCommand():
             cli.run_play(
                 args.command.input,
                 args.command.sample,
             )
-        case "QuantizeCommand":
+        case QuantizeCommand():
             cli.run_quantize(
                 args.command.input,
                 args.command.output,
             )
-        case "DequantizeCommand":
+        case DequantizeCommand():
             cli.run_dequantize(
                 args.command.input,
                 args.command.output,
                 args.command.checkpoint,
             )
+        case AppCommand():
+            cli.run_app()
         case _:
             logger.error(f"Unknown command '{args.command}'")
 
