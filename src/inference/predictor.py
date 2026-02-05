@@ -145,3 +145,9 @@ class Predictor:
 
     def get_generated_sequence(self) -> torch.Tensor:
         return self._sequence[: self._playhead_position]
+
+    def get_cached_sequence(self) -> torch.Tensor:
+        return self._sequence
+
+    def get_position(self) -> int:
+        return self._playhead_position

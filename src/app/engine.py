@@ -152,6 +152,7 @@ class MidiEngine:
                 case "stop":
                     self.initial_clock_received = False
                     self.playing = False
+                    self.note_velocities[:] = 0  # Clear all currently playing notes
                 case "continue":
                     self.initial_clock_received = False
                     self.playing = True
@@ -208,6 +209,11 @@ class MidiEngine:
                     # If the grace period elapsed, process the notes and wait for the next clock pulse
                     if timer.time >= last_division_time + self.config.grace_period:
                         grace_period_state = self.GracePeriodState.WAIT_NEXT_CLOCK
+
+                        # Cutoff all notes that haven't been fired yet (because they were delayed really long)
+                        for note in np.flatnonzero(note_states):
+                            self._send(mido.Message(type="note_off", note=note, velocity=127))
+                        note_states[:] = self.NoteState.IDLE.value
 
                         # Store timestamp and velocities
                         grace_period_end_time = timer.time
