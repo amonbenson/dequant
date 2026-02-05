@@ -16,7 +16,7 @@ REDUCED_DRUM_CATEGORIES = [
 @dataclass
 class DrumHit:
     time: float
-    drum: str
+    drum: int
     velocity: float = 127
 
 

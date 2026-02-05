@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from ...config import CONFIG
-from ..converters.hov_converter import HOVConverter, HOVConverterConfig
+from ..converters.hov_converter import FileInfos, HOVConverter, HOVConverterConfig
 from .download import download_file, unzip_file
 
 logger = logging.getLogger("egmd")
@@ -43,7 +43,7 @@ def preprocess_egmd():
     logger.debug(f"Removed {filter_count} files due to mismatching time signature")
 
     # split in train, test, validation
-    df_splits = {
+    df_splits: dict[str, pd.DataFrame] = {  # pyright: ignore[reportAssignmentType]
         "train": df_filt[df_filt["split"] == "train"],
         "test": df_filt[df_filt["split"] == "test"],
         "validation": df_filt[df_filt["split"] == "validation"],
@@ -62,10 +62,10 @@ def preprocess_egmd():
             continue
 
         # Convert df entries to file info list
-        file_infos = [
+        file_infos: FileInfos = [
             (
-                midi_dir / "e-gmd-v1.0.0" / row.midi_filename,
-                row.bpm,
+                midi_dir / "e-gmd-v1.0.0" / str(row.midi_filename),  # pyright: ignore[reportAttributeAccessIssue]
+                int(row.bpm),  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
             )
             for row in df.itertuples(index=False)
         ]

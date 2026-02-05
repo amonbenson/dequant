@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 from urllib.request import urlretrieve
 from zipfile import ZipFile
 
@@ -14,7 +15,7 @@ def download_file(url: str, filename: Path):
         return
 
     # Show a nice progress bar
-    progress: tqdm = None
+    progress: Optional[tqdm] = None
 
     # Hook to update the progress bar
     def reporthook(_, block_size, total_size):
