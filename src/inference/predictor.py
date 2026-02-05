@@ -71,12 +71,20 @@ class Predictor:
 
         self._pos_enc = torch.from_numpy(self.converter.positional_encoding(bar_idx, pos_in_bar, self._max_seq_len))
 
+    def _adjust_capacity(self):
+        if self._playhead_position > 16000:
+            logger.error("Cannot increase capacity past 16000! This would result in massive performance issues.")
+            return
+
+        # If the playhead reaches the end of the sequence, double its capacity
+        if self._playhead_position + 2 >= len(self._sequence):
+            self._sequence = torch.cat([self._sequence, torch.empty_like(self._sequence)], dim=0)
+            self._update_pos_enc()
+
     def process_step(self, step_hits: torch.Tensor):
         with torch.no_grad():
-            # If the playhead reaches the end of the sequence, double its capacity
-            if self._playhead_position + 2 >= len(self._sequence):
-                self._sequence = torch.cat([self._sequence, torch.empty_like(self._sequence)], dim=0)
-                self._update_pos_enc()
+            # Adjust the capacity (if necessary)
+            self._adjust_capacity()
 
             # Calculate the sequence start and end index that can be handled by the model. The start position
             # will start of as 0, but increase once we reach max_seq_len
@@ -129,6 +137,11 @@ class Predictor:
 
         # Return the full generated sequence
         return self.get_generated_sequence()
+
+    def seek(self, step_position: int):
+        # Move the playhead
+        self._playhead_position = step_position
+        self._adjust_capacity()
 
     def get_generated_sequence(self) -> torch.Tensor:
         return self._sequence[: self._playhead_position]

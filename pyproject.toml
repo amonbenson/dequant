@@ -17,3 +17,6 @@ addopts = ["--capture=no"]  # Always print test output
 preview = true
 exclude = ["notebooks/"]
 line-length = 180
+
+[tool.pyright]
+typeCheckingMode = "basic"

@@ -1,19 +1,60 @@
 import asyncio
+from pathlib import Path
 
 import flet as ft
+import numpy as np
+import torch
 
-from .engine import MidiEngine
-from .processor import RealtimeProcessor
-from .sync import MidiSync
+from .engine import MidiEngine, Position
+from ..inference.predictor import Predictor, PredictorConfig
+from ..data.drum_category import DrumCategory
+from ..config import CONFIG
 
 
 def main(page: ft.Page):
-    page.title = "MIDI App"
+    category_lookup = DrumCategory.generate_forward_lookup(CONFIG.model.drums.categories)
+    category_reverse_lookup = DrumCategory.generate_reverse_lookup(CONFIG.model.drums.categories)
 
-    sync = MidiSync()
-    processor = RealtimeProcessor()
-    engine = MidiEngine(sync, processor)
-    engine.start()
+    engine = MidiEngine()
+    predictor = Predictor(
+        PredictorConfig(
+            checkpoint=Path(".data/checkpoints/cp_20260201051208.pt"),
+            model=CONFIG.model,
+        )
+    )
+
+    def handle_step(input_velocities: np.ndarray, step_position: int) -> tuple[np.ndarray, np.ndarray]:
+        num_instruments = CONFIG.model.drums.num_instruments
+
+        # Check which categories were triggered
+        triggered_categories = category_lookup[input_velocities > 0]
+        triggered_categories_unique = np.unique(triggered_categories)
+
+        # Generate the hits array - all triggered categories get set to 1.0, the others remain at 0.0
+        hits = np.zeros(num_instruments, dtype=np.float32)
+        hits[triggered_categories_unique] = 1.0
+
+        # Run the inference at the current position
+        predictor.seek(step_position)
+        predictor.process_step(torch.from_numpy(hits))
+
+        # Retrieve the last generated step
+        hov = predictor.get_generated_sequence()[-1]
+        predicted_offsets = hov[:, 1].numpy()
+        predicted_velocities = hov[:, 2].numpy()
+
+        # Check which notes were triggered (based on the categories)
+        triggered_notes = category_reverse_lookup[triggered_categories_unique]
+
+        # Set the offsets. Negative values will be clipped to 0.0
+        note_offsets = np.zeros(128, dtype=np.float32)
+        note_offsets[triggered_notes] = np.clip(predicted_offsets[triggered_categories_unique] + 0.0, 0.0, 1.0)
+
+        # Set the velocities. Increase range to 1..127
+        note_velocities = np.zeros(128, dtype=np.uint8)
+        note_velocities[triggered_notes] = (np.clip(predicted_velocities[triggered_categories_unique], 0.0, 1.0) * 127.0).astype(np.uint8)
+
+        return note_offsets, note_velocities
 
     def on_input_select(e: ft.Event[ft.Dropdown]):
         if e.control.value:
@@ -28,15 +69,15 @@ def main(page: ft.Page):
             page.update()
 
     async def ui_updater():
-        last_bar = last_beat = -1
+        prev_pos = Position()
+
         while engine.running:
-            bar, beat, bpm, playing = sync.get_position()
-            if bar != last_bar or beat != last_beat:
-                last_bar, last_beat = bar, beat
-                status = "" if playing else "  [stopped]"
-                bpm_str = f"  ({bpm:.0f} BPM)" if bpm > 0 else ""
-                transport_label.value = f"Bar {bar}  Beat {beat}{bpm_str}{status}"
+            pos = engine.get_position()
+            if pos != prev_pos:
+                prev_pos = pos
+                transport_label.value = f"{pos.bar + 1}.{pos.beat + 1}.{pos.division + 1}+{pos.clock}"
                 page.update()
+
             await asyncio.sleep(0.05)
 
     page.run_task(ui_updater)
@@ -60,7 +101,7 @@ def main(page: ft.Page):
         width=300,
     )
 
-    transport_label = ft.Text("Bar -  Beat -", size=16, weight=ft.FontWeight.BOLD)
+    transport_label = ft.Text("-.-.-", size=16, weight=ft.FontWeight.BOLD)
 
     log = ft.TextField(
         multiline=True,
@@ -78,6 +119,10 @@ def main(page: ft.Page):
             log,
         ])
     )
+    page.title = "Drum Dequantization"
+
+    engine.on_step(handle_step)
+    engine.start()
 
 
 if __name__ == "__main__":

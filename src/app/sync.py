@@ -1,7 +1,7 @@
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # True MIDI constants (defined by the MIDI spec, never change)
 MIDI_CLOCKS_PER_BEAT = 24
@@ -15,12 +15,39 @@ class MidiSyncConfig:
     ticks_per_beat: int = 4  # 4 = 16th notes, 2 = 8th notes, etc.
 
     @property
-    def clocks_per_division(self) -> int:
+    def clocks_per_tick(self) -> int:
         return MIDI_CLOCKS_PER_BEAT // self.ticks_per_beat
 
     @property
     def clocks_per_bar(self) -> int:
         return MIDI_CLOCKS_PER_BEAT * self.beats_per_bar
+
+
+@dataclass
+class Position:
+    bar: int = 0
+    beat: int = 0
+    division: int = 0
+    clock: int = 0
+
+    @staticmethod
+    def from_clock(total_clocks: int, config: MidiSyncConfig):
+        total_tick = total_clocks // config.clocks_per_tick
+        total_beat = total_tick // config.ticks_per_beat
+
+        return Position(
+            bar=total_beat // config.beats_per_bar,
+            beat=total_beat % config.beats_per_bar,
+            division=total_tick % config.ticks_per_beat,
+            clock=total_clocks % config.clocks_per_tick,
+        )
+
+
+@dataclass
+class TransportState:
+    bpm: float = 120.0
+    playing: bool = False
+    position: Position = field(default_factory=Position)
 
 
 class MidiSync:
@@ -29,7 +56,7 @@ class MidiSync:
     def __init__(self, config: MidiSyncConfig | None = None):
         self._config = config or MidiSyncConfig()
         self._lock = threading.Lock()
-        self.tick_count = 0
+        self.clock = 0
         self.playing = False
         self.bpm = 0.0
         self._tick_times: deque[float] = deque(maxlen=MIDI_CLOCKS_PER_BEAT)
@@ -38,8 +65,7 @@ class MidiSync:
         self.division_times: deque[float] = deque()
 
     def handle(self, msg) -> None:
-        """Called directly from the MIDI input callback. Must be fast."""
-        cpd = self._config.clocks_per_division
+        cpt = self._config.clocks_per_tick
         with self._lock:
             match msg.type:
                 case "clock":
@@ -47,9 +73,9 @@ class MidiSync:
                     if not self.playing:
                         self.playing = True
                         self._tick_times.clear()
-                    old_div = self.tick_count // cpd
-                    self.tick_count += 1
-                    new_div = self.tick_count // cpd
+                    old_div = self.clock // cpt
+                    self.clock += 1
+                    new_div = self.clock // cpt
                     self._tick_times.append(now)
                     if len(self._tick_times) >= 2:
                         span = self._tick_times[-1] - self._tick_times[0]
@@ -59,7 +85,7 @@ class MidiSync:
                         self.division_times.append(now)
                         self.division_event.set()
                 case "start":
-                    self.tick_count = 0
+                    self.clock = 0
                     self.playing = True
                     self._tick_times.clear()
                     self.bpm = 0.0
@@ -68,15 +94,29 @@ class MidiSync:
                 case "continue":
                     self.playing = True
                 case "songpos":
-                    self.tick_count = msg.pos * 6
+                    self.clock = msg.pos * 6
 
-    def get_position(self) -> tuple[int, int, float, bool]:
-        """Thread-safe read of current (bar, beat, bpm, playing)."""
-        cpb = self._config.clocks_per_bar
+    def is_playing(self) -> bool:
         with self._lock:
-            ticks = self.tick_count
-            bpm = self.bpm
-            playing = self.playing
-        bar = ticks // cpb + 1
-        beat = (ticks % cpb) // MIDI_CLOCKS_PER_BEAT + 1
-        return bar, beat, bpm, playing
+            return self.playing
+
+    def get_bpm(self) -> float:
+        return self.bpm
+
+    def get_clock_position(self) -> int:
+        with self._lock:
+            return self.clock
+
+    def get_tick_position(self) -> int:
+        return self.get_clock_position() // self._config.clocks_per_tick
+
+    def get_position(self) -> Position:
+        clock_position = self.get_clock_position()
+        return Position.from_clock(clock_position, self._config)
+
+    def get_transport_state(self) -> TransportState:
+        return TransportState(
+            bpm=self.get_bpm(),
+            playing=self.is_playing(),
+            position=self.get_position(),
+        )

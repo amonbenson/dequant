@@ -1,48 +1,99 @@
-import threading
-import time
-from collections import deque
 from dataclasses import dataclass
-from typing import Optional
+from enum import Enum
+import threading
 
 import mido
 import numpy as np
 
-from .processor import RealtimeProcessor
-from .sync import SYNC_TYPES, MidiSync
+from ..utils.accurate_timer import AccurateTimer
+from ..utils.sliding_window_estimator import SlidingWindowEstimator
+
+
+MIDI_CLOCKS_PER_BEAT = 24
 
 
 @dataclass
 class MidiEngineConfig:
-    grace_period: float = 0.005  # seconds after division boundary
-    poll_interval: float = 0.002  # seconds between division polls
+    update_period: float = 0.01
+    grace_period: float = 0.005
+
+    beats_per_bar: int = 4
+    ticks_per_beat: int = 4
+
+    @property
+    def clocks_per_tick(self) -> int:
+        return MIDI_CLOCKS_PER_BEAT // self.ticks_per_beat
+
+    @property
+    def clocks_per_bar(self) -> int:
+        return MIDI_CLOCKS_PER_BEAT * self.beats_per_bar
+
+
+@dataclass
+class Position:
+    bar: int = 0
+    beat: int = 0
+    division: int = 0
+    clock: int = 0
+
+    @staticmethod
+    def from_clock(total_clocks: int, config: MidiEngineConfig):
+        total_tick = total_clocks // config.clocks_per_tick
+        total_beat = total_tick // config.ticks_per_beat
+
+        return Position(
+            bar=total_beat // config.beats_per_bar,
+            beat=total_beat % config.beats_per_bar,
+            division=total_tick % config.ticks_per_beat,
+            clock=total_clocks % config.clocks_per_tick,
+        )
 
 
 class MidiEngine:
-    """Routes MIDI messages and runs the division-quantized processing loop.
+    class GracePeriodState(Enum):
+        WAIT_FIRST_CLOCK = 0
+        GRACE_PERIOD = 1
+        WAIT_NEXT_CLOCK = 2
 
-    Sync messages are handled directly in the MIDI callback (zero latency).
-    Note messages are accumulated per division and batch-processed.
-    """
+    class NoteState(Enum):
+        IDLE = 0
+        DELAYING = 1
+        PLAYING = 2
 
-    def __init__(
-        self,
-        sync: MidiSync,
-        processor: RealtimeProcessor,
-        config: MidiEngineConfig | None = None,
-    ):
-        self._config = config or MidiEngineConfig()
-        self._sync = sync
-        self._processor = processor
-        self._inbox: deque = deque()
-        self._midi_in = None
-        self._midi_out = None
-        self._running = False
-        self._thread: Optional[threading.Thread] = None
-        self._velocities = np.zeros(128, dtype=np.uint8)
+    def __init__(self, config: MidiEngineConfig = MidiEngineConfig()):
+        self.config = config
+        self.midi_in = None
+        self.midi_out = None
 
-    @property
-    def running(self) -> bool:
-        return self._running
+        self.running = False
+        self.playing = False
+        self.initial_clock_received = False
+        self.hotzone = False
+        self.clock_position = 0
+
+        self.last_clock_window = np.zeros(16, dtype=np.float64)
+        self.last_clock_window_size = 0
+
+        self.clock_duration_estimator = SlidingWindowEstimator(60 / (120 * MIDI_CLOCKS_PER_BEAT))
+
+        self.thread = None
+        self.sync_lock = threading.Lock()
+        self.clock_event = threading.Event()
+
+        self.note_velocities = np.zeros(128, dtype=np.uint8)
+        self.step_callback = None
+
+    def on_step(self, cb):
+        self.step_callback = cb
+
+    def get_bpm(self) -> float:
+        if self.clock_duration_estimator.accuracy() == 0:
+            return 0.0
+        else:
+            return 60 / (self.clock_duration_estimator.value * MIDI_CLOCKS_PER_BEAT)
+
+    def get_position(self):
+        return Position.from_clock(self.clock_position, self.config)
 
     @staticmethod
     def get_input_ports() -> list[str]:
@@ -53,110 +104,148 @@ class MidiEngine:
         return mido.get_output_names()
 
     def open_input(self, port_name: str):
-        if self._midi_in:
-            self._midi_in.close()
-        self._midi_in = mido.open_input(port_name, callback=self._on_midi_message)
+        if self.midi_in:
+            self.midi_in.close()
+        self.midi_in = mido.open_input(port_name, callback=self._on_midi_message)
 
     def open_output(self, port_name: str):
-        if self._midi_out:
-            self._midi_out.close()
-        self._midi_out = mido.open_output(port_name)
+        if self.midi_out:
+            self.midi_out.close()
+        self.midi_out = mido.open_output(port_name)
 
-    def _on_midi_message(self, msg):
-        """MIDI input callback. Sync is handled inline; rest is queued."""
-        if msg.type in SYNC_TYPES:
-            self._sync.handle(msg)
-        else:
-            self._inbox.append(msg)
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
 
-    def start(self) -> None:
-        self._running = True
-        self._thread = threading.Thread(target=self._loop, daemon=True)
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._running = False
-        if self._midi_in:
-            self._midi_in.close()
-            self._midi_in = None
-        if self._midi_out:
-            self._midi_out.close()
-            self._midi_out = None
-        if self._thread:
-            self._thread.join(timeout=1.0)
-            self._thread = None
+    def stop(self):
+        self.playing = False
+        self.running = False
+        if self.midi_in:
+            self.midi_in.close()
+            self.midi_in = None
+        if self.midi_out:
+            self.midi_out.close()
+            self.midi_out = None
+        if self.thread:
+            self.thread.join(timeout=1.0)
 
     def _send(self, msg) -> None:
-        if self._midi_out:
-            self._midi_out.send(msg)
+        if self.midi_out:
+            self.midi_out.send(msg)
 
-    def _loop(self) -> None:
-        sync = self._sync
-        cfg = self._config
-
-        note_delays = [0] * 128
-        pending_on = [0] * 128
-        pending_off = [False] * 128
-
-        while self._running:
-            # Wait for division with responsive polling
-            got_division = False
-            while self._running:
-                if sync.division_event.is_set():
-                    sync.division_event.clear()
-                    got_division = True
-                    break
-                # Pass through non-synced messages while waiting
-                if self._inbox:
-                    while self._inbox:
-                        self._send(self._inbox.popleft())
-                else:
-                    time.sleep(cfg.poll_interval)
-
-            if not self._running or not got_division:
-                continue
-
-            # Drain division timestamps
-            while sync.division_times:
-                sync.division_times.popleft()
-
-            # Send pending delay=1 notes from previous division
-            for n in range(128):
-                if pending_on[n] > 0:
-                    self._send(mido.Message("note_on", note=n, velocity=pending_on[n]))
-                    pending_on[n] = 0
-                if pending_off[n]:
-                    self._send(mido.Message("note_off", note=n, velocity=0))
-                    pending_off[n] = False
-
-            # Spin-wait grace period
-            grace_end = time.perf_counter() + cfg.grace_period
-            while time.perf_counter() < grace_end:
-                pass
-
-            # Drain inbox into velocity vector
-            self._velocities[:] = 0
-            while self._inbox:
-                msg = self._inbox.popleft()
-                if msg.type == "note_on" and msg.velocity > 0:
-                    self._velocities[msg.note] = msg.velocity
-                elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
-                    if note_delays[msg.note] == 0:
-                        self._send(msg)
+    def _on_midi_message(self, msg):
+        with self.sync_lock:
+            # Handle incoming messages
+            match msg.type:
+                case "clock":
+                    if self.initial_clock_received:
+                        self.clock_position += 1
+                    self.initial_clock_received = True
+                    self.playing = True
+                    self.clock_duration_estimator.update()
+                case "start":
+                    self.clock_position = 0
+                    self.initial_clock_received = False
+                    self.playing = True
+                    self.clock_duration_estimator.update(skip_estimate=True)
+                case "stop":
+                    self.initial_clock_received = False
+                    self.playing = False
+                case "continue":
+                    self.initial_clock_received = False
+                    self.playing = True
+                    self.clock_duration_estimator.update(skip_estimate=True)
+                case "songpos":
+                    self.clock_position = msg.pos * 6
+                case "note_on":
+                    if self.playing:
+                        # Store note velocity
+                        self.note_velocities[msg.note] = msg.velocity
                     else:
-                        pending_off[msg.note] = True
-                else:
+                        # Pass through while not playing
+                        self._send(msg)
+                case "note_off":
+                    if self.playing:
+                        # Clear note velocity
+                        self.note_velocities[msg.note] = 0
+                    else:
+                        # Pass through while not playing
+                        self._send(msg)
+                case _:
+                    # Pass through other messages
                     self._send(msg)
 
-            # Process the division
-            bar, beat, _, _ = sync.get_position()
-            new_velocities, delays = self._processor.process(self._velocities, bar, beat)
+    def _loop(self):
+        timer = AccurateTimer(self.config.update_period)
 
-            # Send or queue results
-            for n in range(128):
-                if new_velocities[n] > 0:
-                    note_delays[n] = delays[n]
-                    if delays[n] == 0:
-                        self._send(mido.Message("note_on", note=n, velocity=new_velocities[n]))
-                    else:
-                        pending_on[n] = new_velocities[n]
+        grace_period_state = self.GracePeriodState.WAIT_FIRST_CLOCK
+        last_division_time = timer.time
+        grace_period_end_time = timer.time
+
+        note_states = np.ones(128, dtype=np.uint8) * self.NoteState.IDLE.value
+        note_velocities = np.empty(128, dtype=np.uint8)
+        note_offsets = np.empty(128, dtype=np.float32)
+        note_duration = np.empty(128, dtype=np.float32)
+
+        while self.running:
+            # Wait until we are playing again
+            while not self.playing:
+                timer.sleep()
+
+            # Get the current subclock position (clock within a division)
+            with self.sync_lock:
+                subclocks = self.clock_position % self.config.clocks_per_tick
+
+            match grace_period_state:
+                case self.GracePeriodState.WAIT_FIRST_CLOCK:
+                    # Start the grace period as soon as we cross a division
+                    if subclocks == 0:
+                        last_division_time = timer.time
+                        grace_period_state = self.GracePeriodState.GRACE_PERIOD
+
+                case self.GracePeriodState.GRACE_PERIOD:
+                    # If the grace period elapsed, process the notes and wait for the next clock pulse
+                    if timer.time >= last_division_time + self.config.grace_period:
+                        grace_period_state = self.GracePeriodState.WAIT_NEXT_CLOCK
+
+                        # Store timestamp and velocities
+                        grace_period_end_time = timer.time
+                        with self.sync_lock:
+                            input_velocities = self.note_velocities
+
+                        # Invoke the processor
+                        seconds_per_tick = 60 / (self.get_bpm() * self.config.ticks_per_beat)
+                        if self.step_callback:
+                            tick_offsets, note_velocities = self.step_callback(input_velocities, self.clock_position // self.config.clocks_per_tick)
+                            note_offsets = tick_offsets * seconds_per_tick  # Convert delay from ticks to seconds
+                        else:
+                            note_velocities[:] = input_velocities
+                            note_offsets[:] = 0.0
+                        note_duration[:] = 0.5 * seconds_per_tick  # Play note for 0.5 ticks
+
+                        # Init note states at each point where we have a velocity > 0
+                        note_states = np.where(note_velocities > 0, self.NoteState.DELAYING.value, self.NoteState.IDLE.value)
+
+                case self.GracePeriodState.WAIT_NEXT_CLOCK:
+                    # If we've reached the next cycle, start over
+                    if subclocks > 0:
+                        grace_period_state = self.GracePeriodState.WAIT_FIRST_CLOCK
+
+            # Update note states and fire events on state transitions
+            for note in np.flatnonzero(note_states):
+                match self.NoteState(note_states[note]):
+                    case self.NoteState.IDLE:
+                        pass
+
+                    case self.NoteState.DELAYING:
+                        if timer.time >= grace_period_end_time + note_offsets[note]:
+                            note_states[note] = self.NoteState.PLAYING.value
+                            self._send(mido.Message(type="note_on", note=note, velocity=note_velocities[note]))
+
+                    case self.NoteState.PLAYING:
+                        if timer.time >= grace_period_end_time + note_offsets[note] + note_duration[note]:
+                            note_states[note] = self.NoteState.IDLE.value
+                            self._send(mido.Message(type="note_off", note=note, velocity=127))
+
+            timer.sleep()

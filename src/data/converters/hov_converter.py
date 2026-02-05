@@ -24,27 +24,14 @@ FileInfos = list[tuple[Path, int]]
 @dataclass
 class HOVConverterConfig:
     steps_per_beat: int = 4
-    categories: list[DrumCategory] = field(default_factory=DEFAULT_DRUM_CATEGORIES)
+    categories: list[DrumCategory] = field(default_factory=lambda: DEFAULT_DRUM_CATEGORIES)
     _category_lookup: np.ndarray = field(init=False)
     _category_reverse_lookup: np.ndarray = field(init=False)
 
     # bar_period: int = 8
     def __post_init__(self):
-        # Initialize the category lookup table
-        # Maps pitch -> category id or -1 if the note has no category
-        self._category_lookup = -np.ones(128, dtype=np.int8)
-        for i, cat in enumerate(self.categories):
-            for pitch in cat.pitches:
-                if pitch < 0 or pitch > 127:
-                    raise ValueError(f"Category {cat.label}: pitch {pitch} is out of range.")
-                if self._category_lookup[pitch] != -1:
-                    raise ValueError(f"Category: {cat.label}: pitch {pitch} was already mapped to another category. Category pitches must be unique!")
-                self._category_lookup[pitch] = i
-
-        # Initialize the reverse-category lookup. As each category might have multiple notes
-        # associated with it, only choose the first one.
-        # Maps category id -> pitch
-        self._category_reverse_lookup = np.array([cat.pitches[0] for cat in self.categories])
+        self._category_lookup = DrumCategory.generate_forward_lookup(self.categories)
+        self._category_reverse_lookup = DrumCategory.generate_reverse_lookup(self.categories)
 
 
 class HOVConverter:
