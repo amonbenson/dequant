@@ -57,6 +57,17 @@ class Predictor:
 
         self.reset()
 
+    @property
+    def context_start(self) -> int:
+        # Ideally we start the context from the beginning of the sequence, but we have to
+        # limit it to the max sequence length
+        return max(0, self._playhead_position - self.config.model.max_seq_len + 1)
+
+    @property
+    def context_end(self) -> int:
+        # Always end context at the current playhead position
+        return self._playhead_position
+
     def reset(self):
         # Reset position and clear the sequence
         self._playhead_position = 0
@@ -78,7 +89,7 @@ class Predictor:
 
         # If the playhead reaches the end of the sequence, double its capacity
         if self._playhead_position + 2 >= len(self._sequence):
-            self._sequence = torch.cat([self._sequence, torch.empty_like(self._sequence)], dim=0)
+            self._sequence = torch.cat([self._sequence, torch.zeros_like(self._sequence)], dim=0)
             self._update_pos_enc()
 
     def process_step(self, step_hits: torch.Tensor):
@@ -86,27 +97,22 @@ class Predictor:
             # Adjust the capacity (if necessary)
             self._adjust_capacity()
 
-            # Calculate the sequence start and end index that can be handled by the model. The start position
-            # will start of as 0, but increase once we reach max_seq_len
-            step_end = self._playhead_position
-            step_start = max(0, step_end - self.config.model.max_seq_len + 1)
-
             # Decoder input will be a concatenation of the start token and
             default_ov = torch.zeros((self._num_instruments, 2))
             decoder_input = torch.cat(
                 [
                     default_ov.unsqueeze(0),  # Start token
-                    self._sequence[step_start:step_end, :, 1:3],  # Use OV-components (without hits)
+                    self._sequence[self.context_start : self.context_end, :, 1:3],  # Use OV-components (without hits)
                 ],
                 dim=0,
             )
 
             # Store the hits for the new step
-            self._sequence[step_end, :, 0] = step_hits
+            self._sequence[self.context_end, :, 0] = step_hits
 
             # Cut out the current sequence area from the hits and positional encoding
-            encoder_input = self._sequence[step_start : step_end + 1, :, 0]  # Hits only
-            pos_enc_input = self._pos_enc[step_start : step_end + 1]
+            encoder_input = self._sequence[self.context_start : self.context_end + 1, :, 0]  # Hits only
+            pos_enc_input = self._pos_enc[self.context_start : self.context_end + 1]
 
             # Run the model to get a full sequence prediction
             prediction = self.model(
@@ -116,7 +122,7 @@ class Predictor:
             )[0]
 
             # Store the OV component of last predicted timestep into the generated sequence
-            self._sequence[step_end, :, 1:3] = torch.where(
+            self._sequence[self.context_end, :, 1:3] = torch.where(
                 step_hits.unsqueeze(-1) > 0.5,  # If there was a hit
                 prediction[-1],  # Then store the predicted OV-values
                 default_ov,  # Else, store the default OV (zeros)
@@ -143,11 +149,14 @@ class Predictor:
         self._playhead_position = step_position
         self._adjust_capacity()
 
-    def get_generated_sequence(self) -> torch.Tensor:
-        return self._sequence[: self._playhead_position]
-
     def get_cached_sequence(self) -> torch.Tensor:
         return self._sequence
+
+    def get_context_sequence(self) -> torch.Tensor:
+        return self._sequence[self.context_start : self.context_end]
+
+    def get_generated_sequence(self) -> torch.Tensor:
+        return self._sequence[: self._playhead_position]
 
     def get_position(self) -> int:
         return self._playhead_position

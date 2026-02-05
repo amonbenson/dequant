@@ -62,114 +62,113 @@ class MidiEngine:
 
     def __init__(self, config: MidiEngineConfig = MidiEngineConfig()):
         self.config = config
-        self.midi_in = None
-        self.midi_out = None
+        self._midi_in = None
+        self._midi_out = None
 
-        self.running = False
-        self.playing = False
-        self.initial_clock_received = False
-        self.hotzone = False
-        self.clock_position = 0
+        self._running = False
+        self._playing = False
 
-        self.last_clock_window = np.zeros(16, dtype=np.float64)
-        self.last_clock_window_size = 0
+        self._clock_position = 0
+        self._clock_duration_estimator = SlidingWindowEstimator(60 / (120 * MIDI_CLOCKS_PER_BEAT))
+        self._initial_clock_received = False
 
-        self.clock_duration_estimator = SlidingWindowEstimator(60 / (120 * MIDI_CLOCKS_PER_BEAT))
+        self._thread = None
+        self._lock = threading.Lock()
 
-        self.thread = None
-        self.sync_lock = threading.Lock()
-        self.clock_event = threading.Event()
-
-        self.note_velocities = np.zeros(128, dtype=np.uint8)
-        self.step_callback = None
+        self._note_velocities = np.zeros(128, dtype=np.uint8)
+        self._step_callback = None
 
     def on_step(self, cb):
-        self.step_callback = cb
+        self._step_callback = cb
+
+    @property
+    def running(self) -> bool:
+        return self._running
 
     def get_bpm(self) -> float:
-        if self.clock_duration_estimator.accuracy() == 0:
+        if self._clock_duration_estimator.accuracy() == 0:
             return 0.0
         else:
-            return 60 / (self.clock_duration_estimator.value * MIDI_CLOCKS_PER_BEAT)
+            return 60 / (self._clock_duration_estimator.value * MIDI_CLOCKS_PER_BEAT)
 
     def get_position(self):
-        return Position.from_clock(self.clock_position, self.config)
+        return Position.from_clock(self._clock_position, self.config)
 
     @staticmethod
     def get_input_ports() -> list[str]:
-        return mido.get_input_names()
+        return mido.get_input_names()  # type: ignore[attr-defined]
 
     @staticmethod
     def get_output_ports() -> list[str]:
-        return mido.get_output_names()
+        return mido.get_output_names()  # type: ignore[attr-defined]
 
     def open_input(self, port_name: str):
-        if self.midi_in:
-            self.midi_in.close()
-        self.midi_in = mido.open_input(port_name, callback=self._on_midi_message)
+        if self._midi_in:
+            self._midi_in.close()
+        self._midi_in = mido.open_input(port_name, callback=self._on_midi_message)  # type: ignore[attr-defined]
 
     def open_output(self, port_name: str):
-        if self.midi_out:
-            self.midi_out.close()
-        self.midi_out = mido.open_output(port_name)
+        if self._midi_out:
+            self._midi_out.close()
+        self._midi_out = mido.open_output(port_name)  # type: ignore[attr-defined]
 
     def start(self):
-        self.running = True
-        self.thread = threading.Thread(target=self._loop, daemon=True)
-        self.thread.start()
+        self._running = True
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
 
     def stop(self):
-        self.playing = False
-        self.running = False
-        if self.midi_in:
-            self.midi_in.close()
-            self.midi_in = None
-        if self.midi_out:
-            self.midi_out.close()
-            self.midi_out = None
-        if self.thread:
-            self.thread.join(timeout=1.0)
+        self._playing = False
+        self._running = False
+        if self._midi_in:
+            self._midi_in.close()
+            self._midi_in = None
+        if self._midi_out:
+            self._midi_out.close()
+            self._midi_out = None
+        if self._thread:
+            self._thread.join(timeout=1.0)
 
     def _send(self, msg) -> None:
-        if self.midi_out:
-            self.midi_out.send(msg)
+        if self._midi_out:
+            self._midi_out.send(msg)
 
     def _on_midi_message(self, msg):
-        with self.sync_lock:
+        with self._lock:
             # Handle incoming messages
             match msg.type:
                 case "clock":
-                    if self.initial_clock_received:
-                        self.clock_position += 1
-                    self.initial_clock_received = True
-                    self.playing = True
-                    self.clock_duration_estimator.update()
+                    if self._initial_clock_received:
+                        self._clock_position += 1
+                    self._initial_clock_received = True
+                    self._playing = True
+                    self._clock_duration_estimator.update()
                 case "start":
-                    self.clock_position = 0
-                    self.initial_clock_received = False
-                    self.playing = True
-                    self.clock_duration_estimator.update(skip_estimate=True)
+                    self._clock_position = 0
+                    self._initial_clock_received = False
+                    self._playing = True
+                    self._clock_duration_estimator.update(skip_estimate=True)
                 case "stop":
-                    self.initial_clock_received = False
-                    self.playing = False
-                    self.note_velocities[:] = 0  # Clear all currently playing notes
+                    self._initial_clock_received = False
+                    self._playing = False
+                    self._note_velocities[:] = 0  # Clear all currently playing notes
                 case "continue":
-                    self.initial_clock_received = False
-                    self.playing = True
-                    self.clock_duration_estimator.update(skip_estimate=True)
+                    self._initial_clock_received = False
+                    self._playing = True
+                    self._clock_duration_estimator.update(skip_estimate=True)
                 case "songpos":
-                    self.clock_position = msg.pos * 6
+                    self._clock_position = msg.pos * 6
                 case "note_on":
-                    if self.playing:
+                    if self._playing:
                         # Store note velocity
-                        self.note_velocities[msg.note] = msg.velocity
+                        self._note_velocities[msg.note] = msg.velocity
                     else:
                         # Pass through while not playing
                         self._send(msg)
                 case "note_off":
-                    if self.playing:
+                    if self._playing:
                         # Clear note velocity
-                        self.note_velocities[msg.note] = 0
+                        self._note_velocities[msg.note] = 0
                     else:
                         # Pass through while not playing
                         self._send(msg)
@@ -178,7 +177,7 @@ class MidiEngine:
                     self._send(msg)
 
     def _loop(self):
-        timer = AccurateTimer(self.config.update_period)
+        timer = AccurateTimer(self.config.update_period, busy_wait_duration=0)
 
         grace_period_state = self.GracePeriodState.WAIT_FIRST_CLOCK
         last_division_time = timer.time
@@ -189,14 +188,14 @@ class MidiEngine:
         note_offsets = np.empty(128, dtype=np.float32)
         note_duration = np.empty(128, dtype=np.float32)
 
-        while self.running:
+        while self._running:
             # Wait until we are playing again
-            while not self.playing:
+            while not self._playing:
                 timer.sleep()
 
             # Get the current subclock position (clock within a division)
-            with self.sync_lock:
-                subclocks = self.clock_position % self.config.clocks_per_tick
+            with self._lock:
+                subclocks = self._clock_position % self.config.clocks_per_tick
 
             match grace_period_state:
                 case self.GracePeriodState.WAIT_FIRST_CLOCK:
@@ -217,13 +216,13 @@ class MidiEngine:
 
                         # Store timestamp and velocities
                         grace_period_end_time = timer.time
-                        with self.sync_lock:
-                            input_velocities = self.note_velocities
+                        with self._lock:
+                            input_velocities = self._note_velocities
 
                         # Invoke the processor
                         seconds_per_tick = 60 / (self.get_bpm() * self.config.ticks_per_beat)
-                        if self.step_callback:
-                            tick_offsets, note_velocities = self.step_callback(input_velocities, self.clock_position // self.config.clocks_per_tick)
+                        if self._step_callback:
+                            tick_offsets, note_velocities = self._step_callback(input_velocities, self._clock_position // self.config.clocks_per_tick)
                             note_offsets = tick_offsets * seconds_per_tick  # Convert delay from ticks to seconds
                         else:
                             note_velocities[:] = input_velocities
