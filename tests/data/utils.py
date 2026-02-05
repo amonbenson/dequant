@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 
 from src.data.datasets.hov_dataset import HOVDataset, HOVDatasetConfig
@@ -38,7 +40,7 @@ def create_dummy_dataset(
     pos_enc = create_dummy_pos_enc(num_steps=num_steps)
 
     config = HOVDatasetConfig(
-        dir="dummy",
+        dir=Path("dummy"),
         seq_len=seq_len,
         sample_stride=sample_stride,
         filter_empty=filter_empty,

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import simpleaudio as sa
@@ -14,7 +15,7 @@ except ImportError as e:
         logger.warning("Fluidsynth library was not found. You will not be able to play midi files.")
 
 
-def run_play(input: Path, sample: int = 0):
+def run_play(input: Path, sample: Optional[int]):
     converter = create_converter()
 
     # Read input data
@@ -28,7 +29,7 @@ def run_play(input: Path, sample: int = 0):
     else:
         # Load a dataset directory and play the first sequence element
         dataset = HOVDataset(HOVDatasetConfig(dir=filename))
-        data = dataset[sample]
+        data = dataset[sample or 0]
 
     # Convert hov to midi object if we got a matrix
     if not isinstance(data, PrettyMIDI):

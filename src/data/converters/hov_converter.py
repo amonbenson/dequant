@@ -11,6 +11,7 @@ import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 from pretty_midi import Instrument, KeySignature, Note, PrettyMIDI, TimeSignature
@@ -74,7 +75,7 @@ class HOVConverter:
 
         return np.stack([beat_sin, beat_cos, bar_sin, bar_cos], axis=-1)  # shape: (T, 4)
 
-    def midi_to_hov(self, midi: Path | PrettyMIDI, tempo_bpm: int = None):
+    def midi_to_hov(self, midi: Path | PrettyMIDI, tempo_bpm: Optional[int] = None):
         midi_data = self._as_pretty_midi(midi)
 
         # If no tempo was provided, we can still try to extract it from the midi file
@@ -82,12 +83,13 @@ class HOVConverter:
             tempo_bpm = round(self.extract_tempo(midi_data))
 
         # Get drum track (should be only drum track)
-        drum_track: Instrument = None
+        drum_track: Optional[Instrument] = None
         for instrument in midi_data.instruments:
             if instrument.is_drum:
                 drum_track = instrument
                 break
-        else:
+
+        if not drum_track:
             raise ValueError(f"No drum track found in {midi}")
 
         # iterate over notes
@@ -198,7 +200,7 @@ class HOVConverter:
 
         """
         if n_workers <= 0:
-            n_workers = os.cpu_count()
+            n_workers = os.cpu_count() or 1
 
         start = time.perf_counter()
 

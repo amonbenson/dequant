@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -79,9 +81,9 @@ def test_trim():
         ],
         axis=0,
     )
-    dataset = HOVDataset(
+    dataset, _ = HOVDataset(
         HOVDatasetConfig(
-            dir="dummy",
+            dir=Path("dummy"),
             seq_len=4,
             sample_stride=2,
             filter_empty=True,
@@ -107,7 +109,7 @@ def test_encoder_decoder():
 
     dataset = HOVEncoderDecoderDataset(
         HOVDatasetConfig(
-            dir="dummy",
+            dir=Path("dummy"),
             seq_len=16,
             sample_stride=8,
             filter_empty=False,
