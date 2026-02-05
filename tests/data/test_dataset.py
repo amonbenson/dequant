@@ -1,7 +1,8 @@
-import pytest
 import numpy as np
-from src.data.datasets.hov_dataset import HOVDataset, HOVEncoderDecoderDataset, HOVDatasetConfig
-from tests.data.utils import create_dummy_hov, create_dummy_dataset, create_dummy_pos_enc
+import pytest
+
+from src.data.datasets.hov_dataset import HOVDataset, HOVDatasetConfig, HOVEncoderDecoderDataset
+from tests.data.utils import create_dummy_dataset, create_dummy_hov, create_dummy_pos_enc
 
 
 def test_dumm_hov_generator():

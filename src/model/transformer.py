@@ -1,8 +1,10 @@
+from dataclasses import dataclass
+
 import torch
 import torch.nn as nn
-from dataclasses import dataclass
-from .encoder import Encoder, EncoderConfig
+
 from .decoder import Decoder, DecoderConfig
+from .encoder import Encoder, EncoderConfig
 
 
 @dataclass

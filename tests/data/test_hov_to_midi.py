@@ -1,8 +1,9 @@
 from tempfile import TemporaryFile
-import numpy as np
-import mido
-from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
+import mido
+import numpy as np
+
+from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
 REDUCED_DRUM_CATEGORIES = [
     DrumCategory("Kick", (35, 36)),

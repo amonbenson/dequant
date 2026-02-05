@@ -1,5 +1,7 @@
 from pathlib import Path
+
 from pretty_midi import PrettyMIDI
+
 from .common import create_converter
 
 

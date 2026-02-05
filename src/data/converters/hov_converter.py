@@ -1,20 +1,22 @@
-"""
-Preprocessing module for MIDI drum files
+"""Preprocessing module for MIDI drum files
 Optimized with parallel processing and vectorized operations
 """
 
 from __future__ import annotations
-import numpy as np
-from pathlib import Path
-from pretty_midi import PrettyMIDI, Instrument, Note, TimeSignature, KeySignature
-import time
-from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, field
+
 import logging
 import os
+import time
 import traceback
-from ..drum_category import DrumCategory, DEFAULT_DRUM_CATEGORIES
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+from pretty_midi import Instrument, KeySignature, Note, PrettyMIDI, TimeSignature
+from tqdm import tqdm
+
+from ..drum_category import DEFAULT_DRUM_CATEGORIES, DrumCategory
 
 logger = logging.getLogger("hov_converter")
 
@@ -24,27 +26,14 @@ FileInfos = list[tuple[Path, int]]
 @dataclass
 class HOVConverterConfig:
     steps_per_beat: int = 4
-    categories: list[DrumCategory] = field(default_factory=DEFAULT_DRUM_CATEGORIES)
+    categories: list[DrumCategory] = field(default_factory=lambda: DEFAULT_DRUM_CATEGORIES)
     _category_lookup: np.ndarray = field(init=False)
     _category_reverse_lookup: np.ndarray = field(init=False)
 
     # bar_period: int = 8
     def __post_init__(self):
-        # Initialize the category lookup table
-        # Maps pitch -> category id or -1 if the note has no category
-        self._category_lookup = -np.ones(128, dtype=np.int8)
-        for i, cat in enumerate(self.categories):
-            for pitch in cat.pitches:
-                if pitch < 0 or pitch > 127:
-                    raise ValueError(f"Category {cat.label}: pitch {pitch} is out of range.")
-                if self._category_lookup[pitch] != -1:
-                    raise ValueError(f"Category: {cat.label}: pitch {pitch} was already mapped to another category. Category pitches must be unique!")
-                self._category_lookup[pitch] = i
-
-        # Initialize the reverse-category lookup. As each category might have multiple notes
-        # associated with it, only choose the first one.
-        # Maps category id -> pitch
-        self._category_reverse_lookup = np.array([cat.pitches[0] for cat in self.categories])
+        self._category_lookup = DrumCategory.generate_forward_lookup(self.categories)
+        self._category_reverse_lookup = DrumCategory.generate_reverse_lookup(self.categories)
 
 
 class HOVConverter:
@@ -197,8 +186,7 @@ class HOVConverter:
         return matrices, pos_enc
 
     def midi_to_hov_batch(self, file_infos: FileInfos, n_workers: int = 0):
-        """
-        Extract matrices from MIDI files with parallel processing
+        """Extract matrices from MIDI files with parallel processing
 
         Args:
             df: DataFrame with MIDI file information (must have 'midi_filename' and 'bpm' columns)
@@ -207,6 +195,7 @@ class HOVConverter:
 
         Returns:
             List of matrices extracted from MIDI files
+
         """
         if n_workers <= 0:
             n_workers = os.cpu_count()

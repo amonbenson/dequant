@@ -1,7 +1,7 @@
 from ..config import CONFIG
-from .preprocess import run_preprocess
 from ..training import Trainer
 from .common import logger
+from .preprocess import run_preprocess
 
 
 def run_train():

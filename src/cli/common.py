@@ -1,6 +1,7 @@
 import logging
-from ..data.converters.hov_converter import HOVConverter, HOVConverterConfig
+
 from ..config import CONFIG
+from ..data.converters.hov_converter import HOVConverter, HOVConverterConfig
 
 logger = logging.getLogger("cli")
 

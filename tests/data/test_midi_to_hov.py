@@ -1,9 +1,10 @@
-import pytest
-import numpy as np
 from dataclasses import dataclass
-from pretty_midi import PrettyMIDI, Instrument, Note
-from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
+import numpy as np
+import pytest
+from pretty_midi import Instrument, Note, PrettyMIDI
+
+from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
 REDUCED_DRUM_CATEGORIES = [
     DrumCategory("Kick", (35, 36)),
