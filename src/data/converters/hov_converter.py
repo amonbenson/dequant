@@ -1,20 +1,22 @@
-"""
-Preprocessing module for MIDI drum files
+"""Preprocessing module for MIDI drum files
 Optimized with parallel processing and vectorized operations
 """
 
 from __future__ import annotations
-import numpy as np
-from pathlib import Path
-from pretty_midi import PrettyMIDI, Instrument, Note, TimeSignature, KeySignature
-import time
-from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, field
+
 import logging
 import os
+import time
 import traceback
-from ..drum_category import DrumCategory, DEFAULT_DRUM_CATEGORIES
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+from pretty_midi import Instrument, KeySignature, Note, PrettyMIDI, TimeSignature
+from tqdm import tqdm
+
+from ..drum_category import DEFAULT_DRUM_CATEGORIES, DrumCategory
 
 logger = logging.getLogger("hov_converter")
 
@@ -184,8 +186,7 @@ class HOVConverter:
         return matrices, pos_enc
 
     def midi_to_hov_batch(self, file_infos: FileInfos, n_workers: int = 0):
-        """
-        Extract matrices from MIDI files with parallel processing
+        """Extract matrices from MIDI files with parallel processing
 
         Args:
             df: DataFrame with MIDI file information (must have 'midi_filename' and 'bpm' columns)
@@ -194,6 +195,7 @@ class HOVConverter:
 
         Returns:
             List of matrices extracted from MIDI files
+
         """
         if n_workers <= 0:
             n_workers = os.cpu_count()

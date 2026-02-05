@@ -1,10 +1,11 @@
 from pathlib import Path
-from pretty_midi import PrettyMIDI
+
 import numpy as np
 import simpleaudio as sa
-from ..data.datasets.hov_dataset import HOVDataset, HOVDatasetConfig
-from .common import logger, create_converter
+from pretty_midi import PrettyMIDI
 
+from ..data.datasets.hov_dataset import HOVDataset, HOVDatasetConfig
+from .common import create_converter, logger
 
 try:
     import fluidsynth  # noqa: F401

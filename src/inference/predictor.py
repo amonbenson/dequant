@@ -1,11 +1,14 @@
-from pathlib import Path
-from dataclasses import dataclass
-import torch
-import numpy as np
 import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import torch
+
+from ..config import ModelConfig
 from ..data.converters.hov_converter import HOVConverter, HOVConverterConfig
 from ..model import DequantTransformer, DequantTransformerConfig
-from ..config import ModelConfig
 from ..utils.checkpoint import Checkpoint
 
 logger = logging.getLogger("predictor")
@@ -13,7 +16,7 @@ logger = logging.getLogger("predictor")
 
 @dataclass
 class PredictorConfig:
-    checkpoint: Path
+    checkpoint: Optional[Path]
     model: ModelConfig
 
 
@@ -32,7 +35,7 @@ class Predictor:
         )
 
         # Load checkpoint. For testing, we might not provide a checkpoint, so we just skip this
-        if config.checkpoint is not None:
+        if self.config.checkpoint is not None:
             Checkpoint.load(
                 self.config.checkpoint,
                 device="cpu",

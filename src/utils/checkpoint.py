@@ -1,9 +1,11 @@
 import logging
+from dataclasses import asdict
 from pathlib import Path
+from typing import Optional
+
 import torch
 import torch.nn as nn
-from dataclasses import asdict
-from typing import Optional
+
 from ..config import RootConfig
 
 logger = logging.getLogger("checkpoint")

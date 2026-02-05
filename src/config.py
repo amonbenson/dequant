@@ -1,7 +1,8 @@
-from pathlib import Path
 from dataclasses import dataclass, field, fields
+from pathlib import Path
 from typing import Optional
-from .data.converters.hov_converter import DrumCategory, DEFAULT_DRUM_CATEGORIES
+
+from .data.converters.hov_converter import DEFAULT_DRUM_CATEGORIES, DrumCategory
 
 
 @dataclass

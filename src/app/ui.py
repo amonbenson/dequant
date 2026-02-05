@@ -8,10 +8,10 @@ import flet.canvas as cv
 import numpy as np
 import torch
 
-from .engine import MidiEngine, Position
-from ..inference.predictor import Predictor, PredictorConfig
-from ..data.drum_category import DrumCategory
 from ..config import CONFIG
+from ..data.drum_category import DrumCategory
+from ..inference.predictor import Predictor, PredictorConfig
+from .engine import MidiEngine, Position
 
 
 class LabeledSlider(ft.Row):

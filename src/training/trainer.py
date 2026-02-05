@@ -1,19 +1,19 @@
 import logging
+import multiprocessing
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
+
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from typing import Optional
-from datetime import datetime
-import multiprocessing
-from ..utils.checkpoint import Checkpoint
-from ..data.datasets.hov_dataset import HOVEncoderDecoderDataset, HOVDatasetConfig
-from ..model import (
-    DequantTransformer as DequantTransformer,
-    DequantTransformerConfig as DequantTransformerConfig,
-)
+
 from ..config import CONFIG
+from ..data.datasets.hov_dataset import HOVDatasetConfig, HOVEncoderDecoderDataset
+from ..model import DequantTransformer as DequantTransformer
+from ..model import DequantTransformerConfig as DequantTransformerConfig
+from ..utils.checkpoint import Checkpoint
 
 logger = logging.getLogger("training")
 

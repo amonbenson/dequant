@@ -1,7 +1,8 @@
 import pytest
 import torch
-from src.inference.predictor import Predictor, PredictorConfig
+
 from src.config import ModelConfig
+from src.inference.predictor import Predictor, PredictorConfig
 
 
 def create_dummy_predictor(model_config: ModelConfig = ModelConfig()):

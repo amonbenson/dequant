@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+
 import numpy as np
 
 
@@ -28,6 +29,7 @@ class RealtimeProcessor:
         Returns:
             (new_velocities, delays) — 128 elements each.
             Delays are 0 (play now) or 1 (play next division).
+
         """
         new_velocities = (velocities > 0).astype(np.uint8) * 127  # [0] * 128
         delays = np.zeros(128, dtype=np.uint8)

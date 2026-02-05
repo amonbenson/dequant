@@ -1,13 +1,12 @@
+import threading
 from dataclasses import dataclass
 from enum import Enum
-import threading
 
 import mido
 import numpy as np
 
 from ..utils.accurate_timer import AccurateTimer
 from ..utils.sliding_window_estimator import SlidingWindowEstimator
-
 
 MIDI_CLOCKS_PER_BEAT = 24
 

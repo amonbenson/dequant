@@ -1,7 +1,8 @@
-from pathlib import Path
 import logging
-from zipfile import ZipFile
+from pathlib import Path
 from urllib.request import urlretrieve
+from zipfile import ZipFile
+
 from tqdm import tqdm
 
 logger = logging.getLogger("download")

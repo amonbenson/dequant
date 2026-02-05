@@ -1,9 +1,12 @@
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+
+from src.data import HOVDatasetConfig, HOVEncoderDecoderDataset
 from src.model import DequantTransformer, DequantTransformerConfig
-from src.data import HOVEncoderDecoderDataset, HOVDatasetConfig
 
 
 def test_dequant_overfitting():
@@ -11,7 +14,7 @@ def test_dequant_overfitting():
 
     dataset = HOVEncoderDecoderDataset(
         HOVDatasetConfig(
-            dir="dummy",
+            dir=Path("dummy"),
             seq_len=4,
             sample_stride=1,
         ),

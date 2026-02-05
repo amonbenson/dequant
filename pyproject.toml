@@ -18,5 +18,9 @@ preview = true
 exclude = ["notebooks/"]
 line-length = 180
 
+[tool.ruff.lint]
+# extend-select = ["I", "D", "Q"]  # Include isort and docstring checks
+extend-select = ["I"]  # Include isort checks
+
 [tool.pyright]
 typeCheckingMode = "basic"

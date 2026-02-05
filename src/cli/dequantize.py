@@ -1,8 +1,10 @@
-import torch
 from pathlib import Path
+
+import torch
 from pretty_midi import PrettyMIDI
-from ..inference.predictor import Predictor, PredictorConfig
+
 from ..config import CONFIG
+from ..inference.predictor import Predictor, PredictorConfig
 from .common import create_converter
 
 

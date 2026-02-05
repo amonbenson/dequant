@@ -1,10 +1,12 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Union, Optional
+from typing import Annotated, Optional, Union
+
 import tyro
-from .config import RootConfig, update_config
+
 from . import cli
+from .config import RootConfig, update_config
 
 logger = logging.getLogger("main")
 
@@ -16,7 +18,7 @@ class PreprocessCommand:
 
 @dataclass
 class TrainCommand:
-    "Train the model."
+    """Train the model."""
 
 
 @dataclass
