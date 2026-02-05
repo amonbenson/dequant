@@ -72,6 +72,16 @@ When training, logs will be written to the `/runs/` directory. You can use tenso
 tensorboard --logdir runs
 ```
 
+## Using the Realtime App
+
+Use the following command to start the realtime dequantization app:
+
+```bash
+python -m src app
+```
+
+The connects to a DAW via MIDI and receives realtime messages to dequantize them on the fly. When the app opens, click the "Load Checkpoint" button to load a previously saved checkpoint. Then select the MIDI input and output ports that are routed from and to your DAW. On Mac OS, you will need to setup a virtual MIDI port using the "Audio MIDI Setup" application. On Windows, you can use a tool like loopMIDI to create virtual MIDI ports. After the inputs are selected, the app will receive MIDI messages from the input port, dequantize them using the loaded model, and send the dequantized messages to the output port. It is important that you configure your DAW to send synchronization messages (e.g. MIDI clock), otherwise the dequantization will not work properly.
+
 ## Configuration
 
 To see a list of available commands and configuration options, type:

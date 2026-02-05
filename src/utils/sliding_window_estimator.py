@@ -30,6 +30,10 @@ class SlidingWindowEstimator:
         if skip_estimate:
             return
 
+        # Reject outliers that are too short (less than 50% of current estimate)
+        if delta_time < self._value * 0.5:
+            return
+
         # Insert the new value
         self._window[self._window_pos] = delta_time
         self._window_pos = (self._window_pos + 1) % len(self._window)

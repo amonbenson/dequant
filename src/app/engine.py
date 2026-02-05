@@ -69,7 +69,7 @@ class MidiEngine:
         self._playing = False
 
         self._clock_position = 0
-        self._clock_duration_estimator = SlidingWindowEstimator(60 / (120 * MIDI_CLOCKS_PER_BEAT))
+        self._clock_duration_estimator = SlidingWindowEstimator(60 / (120 * MIDI_CLOCKS_PER_BEAT), window_size=100)
         self._initial_clock_received = False
 
         self._thread = None
@@ -86,10 +86,7 @@ class MidiEngine:
         return self._running
 
     def get_bpm(self) -> float:
-        if self._clock_duration_estimator.accuracy() == 0:
-            return 0.0
-        else:
-            return 60 / (self._clock_duration_estimator.value * MIDI_CLOCKS_PER_BEAT)
+        return 60 / (self._clock_duration_estimator.value * MIDI_CLOCKS_PER_BEAT)
 
     def get_position(self):
         return Position.from_clock(self._clock_position, self.config)
@@ -140,9 +137,11 @@ class MidiEngine:
                 case "clock":
                     if self._initial_clock_received:
                         self._clock_position += 1
+                        self._clock_duration_estimator.update()
+                    else:
+                        self._clock_duration_estimator.update(skip_estimate=True)
                     self._initial_clock_received = True
                     self._playing = True
-                    self._clock_duration_estimator.update()
                 case "start":
                     self._clock_position = 0
                     self._initial_clock_received = False
@@ -177,7 +176,7 @@ class MidiEngine:
                     self._send(msg)
 
     def _loop(self):
-        timer = AccurateTimer(self.config.update_period, busy_wait_duration=0)
+        timer = AccurateTimer(self.config.update_period)
 
         grace_period_state = self.GracePeriodState.WAIT_FIRST_CLOCK
         last_division_time = timer.time

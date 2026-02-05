@@ -160,8 +160,11 @@ class TransportDisplay(ft.Text):
     def __init__(self):
         super().__init__("-.-.-", size=16, weight=ft.FontWeight.BOLD)
 
-    def set_position(self, pos: Position):
-        self.value = f"{pos.bar + 1}.{pos.beat + 1}.{pos.division + 1}+{pos.clock}"
+    def set_transport_info(self, pos: Position, bpm: Optional[float] = None):
+        pos_info = f"{pos.bar + 1}.{pos.beat + 1}.{pos.division + 1}+{pos.clock}"
+        bpm_info = f" @ {round(bpm)} BPM" if bpm is not None else ""
+
+        self.value = pos_info + bpm_info
 
 
 def main(page: ft.Page):
@@ -277,7 +280,7 @@ def main(page: ft.Page):
             pos = engine.get_position()
             if pos != prev_pos:
                 prev_pos = pos
-                transport_display.set_position(pos)
+                transport_display.set_transport_info(pos, engine.get_bpm())
 
             sequence_canvas.render()
             page.update()
