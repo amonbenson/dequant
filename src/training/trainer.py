@@ -55,6 +55,8 @@ class Trainer:
 
         self.epoch = 0
         self.global_step = 0
+        self.best_val_loss = float("inf")
+        self.patience_counter = 0
         self.writer = SummaryWriter()
 
     def train_epoch(self):
@@ -124,13 +126,22 @@ class Trainer:
 
         # Calculate and log average validation loss
         avg_loss = total_loss / num_batches
-        self.writer.add_scalar("Loss/validation", avg_loss, self.epoch)
+        self.writer.add_scalar("Loss/validation", avg_loss, self.global_step)
 
-        # Save a checkpoint to the default path
+        # Best model tracking
+        if avg_loss < self.best_val_loss:
+            self.best_val_loss = avg_loss
+            self.patience_counter = 0
+            self.save_checkpoint(CONFIG.train.checkpoint_dir / "best.pt")
+            logger.info(f"New best validation loss: {avg_loss:.6f}")
+        else:
+            self.patience_counter += 1
+
+        # Save a periodic checkpoint
         if self.epoch % CONFIG.train.save_every_n_epochs == 0:
             self.save_checkpoint()
 
-        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Loss: {avg_loss:.6f}")
+        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Val loss: {avg_loss:.6f} (best: {self.best_val_loss:.6f}, patience: {self.patience_counter})")
         self.epoch += 1
 
     def train(self):
@@ -149,6 +160,12 @@ class Trainer:
         # Train until the specified epoch
         while self.epoch < CONFIG.train.num_epochs:
             self.train_epoch()
+
+            # Early stopping
+            patience = CONFIG.train.early_stopping_patience
+            if patience > 0 and self.patience_counter >= patience:
+                logger.info(f"Early stopping: no improvement for {patience} epochs.")
+                break
 
         # Close the tensorboard writer
         self.writer.close()
@@ -189,6 +206,7 @@ class Trainer:
             model=self.model,
             optimizer=self.optimizer,
             loss_fn=self.loss_fn,
+            best_val_loss=self.best_val_loss,
         )
 
     def load_checkpoint(self, filename: Optional[Path] = None):
@@ -201,7 +219,7 @@ class Trainer:
                 raise FileNotFoundError("No checkpoints were found.")
 
         # Load the checkpoint and apply all parameters
-        self.epoch, self.loss_fn, self.global_step = Checkpoint.load(
+        self.epoch, self.loss_fn, self.global_step, self.best_val_loss = Checkpoint.load(
             filename,
             device=self.device,
             config=CONFIG,

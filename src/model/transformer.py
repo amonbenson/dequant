@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
+from torch.utils.checkpoint import checkpoint
 
 from .decoder import Decoder, DecoderConfig
 from .encoder import Encoder, EncoderConfig
@@ -40,14 +41,8 @@ class DequantTransformer(nn.Module):
         # Encoder and decoder blocks
         n_heads = config.n_heads
         n_layers = config.n_layers
-        self.encoder_layers = nn.ModuleList([
-            Encoder(EncoderConfig(d_model=d_model, n_heads=n_heads, dropout=dropout))
-            for _ in range(n_layers)
-        ])
-        self.decoder_layers = nn.ModuleList([
-            Decoder(DecoderConfig(d_model=d_model, n_heads=n_heads, dropout=dropout))
-            for _ in range(n_layers)
-        ])
+        self.encoder_layers = nn.ModuleList([Encoder(EncoderConfig(d_model=d_model, n_heads=n_heads, dropout=dropout)) for _ in range(n_layers)])
+        self.decoder_layers = nn.ModuleList([Decoder(DecoderConfig(d_model=d_model, n_heads=n_heads, dropout=dropout)) for _ in range(n_layers)])
         self.encoder_final_ln = nn.LayerNorm(d_model)
         self.decoder_final_ln = nn.LayerNorm(d_model)
 
@@ -93,12 +88,12 @@ class DequantTransformer(nn.Module):
         # Transformer forward pass
         encoder_output = encoder_emb
         for layer in self.encoder_layers:
-            encoder_output = layer(encoder_output)
+            encoder_output = checkpoint(layer, encoder_output, use_reentrant=False)
         encoder_output = self.encoder_final_ln(encoder_output)
 
         y = decoder_emb
         for layer in self.decoder_layers:
-            y = layer(y, encoder_output)
+            y = checkpoint(layer, y, encoder_output, use_reentrant=False)
         y = self.decoder_final_ln(y)
 
         # Project back to output dimension

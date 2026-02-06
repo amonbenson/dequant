@@ -44,24 +44,30 @@ class HOVDataset(Dataset):
             if not npz_files:
                 raise FileNotFoundError(f"No .npz files found in {self.config.dir}. Did you run preprocess?")
 
-            # Load each npz file
-            arrays = []
-            pos_enc_arrays = []
+            # Load all sub-arrays, compute total length, pre-allocate, and copy in one pass per file
+            all_data_chunks = []
+            all_pos_chunks = []
+            total_len = 0
             for filename in npz_files:
                 with np.load(filename, allow_pickle=True) as f:
-                    arrays.append(f["data"])
-                    pos_key = "pos_enc" if "pos_enc" in f.files else "pos_en"  # TODO: change later for 1
-                    pos_enc_arrays.append(f[pos_key])
+                    pos_key = "pos_enc" if "pos_enc" in f.files else "pos_en"
+                    for data_arr, pos_arr in zip(f["data"], f[pos_key]):
+                        all_data_chunks.append(data_arr)
+                        all_pos_chunks.append(pos_arr)
+                        total_len += data_arr.shape[0]
 
-            # Concatenate twice: 1. stich each file together, 2. stich each sequence within each file together
-            concatenated = np.concatenate(arrays, axis=0)
-            concatenated = np.concatenate(concatenated, axis=0)
-            self._data = torch.from_numpy(concatenated).to(torch.float32)
+            # Pre-allocate final tensors and fill from chunks
+            num_instruments = all_data_chunks[0].shape[1]
+            self._data = torch.empty(total_len, num_instruments, 3, dtype=torch.float32)
+            self._pos_enc = torch.empty(total_len, 4, dtype=torch.float32)
 
-            # concatenate for pos_enc too
-            pos_concat = np.concatenate(pos_enc_arrays, axis=0)
-            pos_concat = np.concatenate(pos_concat, axis=0)  # (total_seq*T, 4)
-            self._pos_enc = torch.from_numpy(pos_concat).float()
+            offset = 0
+            for data_arr, pos_arr in zip(all_data_chunks, all_pos_chunks):
+                n = data_arr.shape[0]
+                self._data[offset:offset + n] = torch.from_numpy(data_arr.astype(np.float32, copy=False))
+                self._pos_enc[offset:offset + n] = torch.from_numpy(pos_arr.astype(np.float32, copy=False))
+                offset += n
+            del all_data_chunks, all_pos_chunks
 
         # Validate the data shape (N, instruments, hov=3)
         assert len(self._data.shape) == 3

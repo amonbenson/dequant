@@ -50,7 +50,7 @@ class TransformerConfig:
     d_model: int = 32  # internal model depth
     n_heads: int = 1  # number of attention heads
     n_layers: int = 1  # number of encoder/decoder layers
-    dropout: float = 0.5  # dropout for all layers
+    dropout: float = 0.2  # dropout for all layers
 
 
 @dataclass
@@ -73,15 +73,14 @@ class TrainConfig:
     batch_size: int = 512  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training
-    sample_stride: int = 16  # 3  # offset in which sample sequences are taken from the dataset
+    sample_stride: int = 15  # 3  # offset in which sample sequences are taken from the dataset
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     resume: bool = True  # resume training from a previously saved checkpoint
     resume_from: Optional[Path] = None  # path to the checkpoint to resume from. If not provided, use the latest
     checkpoint_dir: Path = Path(".data/checkpoints")  # where to store checkpoints
     save_every_n_epochs: int = 1  # how often to store checkpoints
-
-    # patience: int = 10
+    early_stopping_patience: int = 10  # stop after N epochs without improvement. 0 = disabled
 
 
 @dataclass

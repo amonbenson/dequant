@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 @dataclass
@@ -57,11 +57,9 @@ class Encoder(nn.Module):
         k = k.view(B, T, n_heads, d_head).transpose(1, 2)
         v = v.view(B, T, n_heads, d_head).transpose(1, 2)
 
-        attn: torch.Tensor = (q @ k.transpose(-2, -1)) / np.sqrt(d_head)
-        attn = torch.softmax(attn, dim=-1)
-        attn = self.attn_dropout(attn)
-
-        x = attn @ v  # (B, n_heads, T, d_head)
+        x = F.scaled_dot_product_attention(
+            q, k, v, dropout_p=self.config.dropout if self.training else 0.0
+        )  # (B, n_heads, T, d_head)
         x = x.transpose(1, 2).contiguous().view(B, T, C)  # (B, T, C)
         x = self.attn_out(x)
         x = residual + self.resid_dropout1(x)
