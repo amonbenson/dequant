@@ -44,6 +44,8 @@ class Trainer:
                 max_seq_len=CONFIG.model.max_seq_len,
                 num_instruments=CONFIG.model.drums.num_instruments,
                 d_model=CONFIG.model.transformer.d_model,
+                n_heads=CONFIG.model.transformer.n_heads,
+                n_layers=CONFIG.model.transformer.n_layers,
                 dropout=CONFIG.model.transformer.dropout,
             )
         )

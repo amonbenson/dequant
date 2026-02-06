@@ -12,6 +12,8 @@ class DequantTransformerConfig:
     max_seq_len: int = 128
     num_instruments: int = 9
     d_model: int = 128
+    n_heads: int = 1
+    n_layers: int = 1
     dropout: float = 0.2
 
 
@@ -36,8 +38,18 @@ class DequantTransformer(nn.Module):
         self.dropout = nn.Dropout(config.dropout)
 
         # Encoder and decoder blocks
-        self.encoder = Encoder(EncoderConfig(d_model=d_model, dropout=dropout))
-        self.decoder = Decoder(DecoderConfig(d_model=d_model, dropout=dropout))
+        n_heads = config.n_heads
+        n_layers = config.n_layers
+        self.encoder_layers = nn.ModuleList([
+            Encoder(EncoderConfig(d_model=d_model, n_heads=n_heads, dropout=dropout))
+            for _ in range(n_layers)
+        ])
+        self.decoder_layers = nn.ModuleList([
+            Decoder(DecoderConfig(d_model=d_model, n_heads=n_heads, dropout=dropout))
+            for _ in range(n_layers)
+        ])
+        self.encoder_final_ln = nn.LayerNorm(d_model)
+        self.decoder_final_ln = nn.LayerNorm(d_model)
 
         # Output projection
         self.output_proj = nn.Linear(d_model, d_decoder_input)
@@ -79,8 +91,15 @@ class DequantTransformer(nn.Module):
         decoder_emb = decoder_emb + pos_emb
 
         # Transformer forward pass
-        encoder_output: torch.Tensor = self.encoder(encoder_emb)
-        y: torch.Tensor = self.decoder(decoder_emb, encoder_output)
+        encoder_output = encoder_emb
+        for layer in self.encoder_layers:
+            encoder_output = layer(encoder_output)
+        encoder_output = self.encoder_final_ln(encoder_output)
+
+        y = decoder_emb
+        for layer in self.decoder_layers:
+            y = layer(y, encoder_output)
+        y = self.decoder_final_ln(y)
 
         # Project back to output dimension
         y = self.output_proj(y)

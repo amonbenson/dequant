@@ -48,6 +48,8 @@ class TransformerConfig:
     """Configuration for the transformer architecture."""
 
     d_model: int = 32  # internal model depth
+    n_heads: int = 1  # number of attention heads
+    n_layers: int = 1  # number of encoder/decoder layers
     dropout: float = 0.5  # dropout for all layers
 
 

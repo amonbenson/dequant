@@ -30,6 +30,8 @@ class Predictor:
                 max_seq_len=self.config.model.max_seq_len,
                 num_instruments=self.config.model.drums.num_instruments,
                 d_model=self.config.model.transformer.d_model,
+                n_heads=self.config.model.transformer.n_heads,
+                n_layers=self.config.model.transformer.n_layers,
                 dropout=self.config.model.transformer.dropout,
             )
         )
