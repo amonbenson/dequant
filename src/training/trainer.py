@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -171,8 +170,7 @@ class Trainer:
             batch_size=CONFIG.train.batch_size,
             shuffle=CONFIG.train.sample_shuffle,
             pin_memory=True if torch.cuda.is_available() else False,
-            num_workers=multiprocessing.cpu_count(),  # Adjust based on your CPU cores
-            persistent_workers=True,  # Keep workers alive between epochs
+            num_workers=0,
         )
         return dataloader
 
