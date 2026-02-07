@@ -50,8 +50,14 @@ class Trainer:
         )
         self.model = self.model.to(self.device)
 
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=CONFIG.train.learning_rate)
+        self.optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=CONFIG.train.learning_rate,
+            weight_decay=CONFIG.train.weight_decay,
+        )
         self.loss_fn = torch.nn.MSELoss()
+
+        self.scheduler = self._create_scheduler()
 
         self.epoch = 0
         self.global_step = 0
@@ -142,6 +148,14 @@ class Trainer:
             self.save_checkpoint()
 
         logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Val loss: {avg_loss:.6f} (best: {self.best_val_loss:.6f}, patience: {self.patience_counter})")
+
+        # Step the learning rate scheduler
+        if self.scheduler is not None:
+            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                self.scheduler.step(avg_loss)
+            else:
+                self.scheduler.step()
+
         self.epoch += 1
 
     def train(self):
@@ -169,6 +183,32 @@ class Trainer:
 
         # Close the tensorboard writer
         self.writer.close()
+
+    def _create_scheduler(self):
+        name = CONFIG.train.lr_scheduler
+        if name == "none":
+            return None
+        elif name == "cosine":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, T_max=CONFIG.train.num_epochs - CONFIG.train.lr_warmup_epochs
+            )
+        elif name == "plateau":
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer, mode="min", factor=0.5, patience=3
+            )
+        else:
+            raise ValueError(f"Unknown lr_scheduler: {name}")
+
+        if CONFIG.train.lr_warmup_epochs > 0:
+            warmup = torch.optim.lr_scheduler.LinearLR(
+                self.optimizer, start_factor=0.01, total_iters=CONFIG.train.lr_warmup_epochs
+            )
+            if name == "plateau":
+                return warmup  # SequentialLR doesn't support ReduceLROnPlateau; just use warmup then step plateau manually
+            scheduler = torch.optim.lr_scheduler.SequentialLR(
+                self.optimizer, schedulers=[warmup, scheduler], milestones=[CONFIG.train.lr_warmup_epochs]
+            )
+        return scheduler
 
     @staticmethod
     def create_dataloader(dir: Path, max_samples: Optional[int] = None):

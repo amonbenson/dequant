@@ -32,21 +32,18 @@ echo -e "${YELLOW}Sweep ID: ${SWEEP_ID}${NC}"
 echo ""
 
 # Define experiments as an array
-# Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs"
+# Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs"
 declare -a EXPERIMENTS=(
-    "xs_baseline|32|2|1|0.3|1e-4|512|50"
-    "s_shallow|64|4|1|0.2|1e-4|512|50"
-    "s_deep|64|4|2|0.2|1e-4|512|50"
-    "s_deep_low_do|64|4|2|0.1|1e-4|512|50"
-    "m_standard|128|4|2|0.2|1e-4|512|50"
-    "m_deep|128|4|3|0.1|1e-4|512|50"
-    "m_manyheads|128|8|2|0.2|1e-4|512|50"
-    "l_deep|256|8|4|0.1|5e-5|512|50"
+    # d_model=256, n_heads=8
+    # larger models
+    "d512_h8_l4|512|8|4|0.0|1e-5|128|50|3"
+    "d512_h16_l4|512|16|4|0.0|1e-5|128|50|3"
+
 )
 
 # Optional: Limit number of epochs for quick testing
 # Uncomment the line below and adjust QUICK_EPOCHS to run shorter experiments
-QUICK_EPOCHS=3
+QUICK_EPOCHS=4
 
 echo -e "${GREEN}Total experiments planned: ${#EXPERIMENTS[@]}${NC}"
 echo ""
@@ -73,7 +70,7 @@ for i in "${!EXPERIMENTS[@]}"; do
     EXP="${EXPERIMENTS[$i]}"
 
     # Parse experiment parameters
-    IFS='|' read -r NAME D_MODEL N_HEADS N_LAYERS DROPOUT LR BATCH_SIZE EPOCHS <<< "$EXP"
+    IFS='|' read -r NAME D_MODEL N_HEADS N_LAYERS DROPOUT LR BATCH_SIZE EPOCHS WARMUP_EPOCHS <<< "$EXP"
 
     # Override epochs for quick testing if QUICK_EPOCHS is set
     if [ ! -z "$QUICK_EPOCHS" ]; then
@@ -94,6 +91,7 @@ for i in "${!EXPERIMENTS[@]}"; do
     echo -e "learning_rate: ${LR}"
     echo -e "batch_size:    ${BATCH_SIZE}"
     echo -e "num_epochs:    ${EPOCHS}"
+    echo -e "warmup_epochs: ${WARMUP_EPOCHS}"
     echo ""
 
     # Create experiment-specific checkpoint directory
@@ -109,9 +107,11 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.learning-rate=${LR} \
         --config.train.batch-size=${BATCH_SIZE} \
         --config.train.num-epochs=${EPOCHS} \
+        --config.train.lr-warmup-epochs=${WARMUP_EPOCHS} \
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
-        --config.train.max-train-samples=28647 \
-        --config.train.max-val-samples=4349 \
+        --config.train.max-train-samples=25000 \
+        --config.train.max-val-samples=5000 \
+        --config.train.no-auto-preprocess \
         train"
 
     # Log the command
@@ -151,6 +151,9 @@ for i in "${!EXPERIMENTS[@]}"; do
 
     # Short pause between experiments
     sleep 2
+    # Clear MPS cache between experiments
+    python -c "import torch; torch.mps.empty_cache() if torch.backends.mps.is_available() else None" 2>/dev/null || true
+
 done
 
 # Summary

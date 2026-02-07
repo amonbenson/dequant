@@ -57,7 +57,7 @@ class TransformerConfig:
 class ModelConfig:
     """Configuration for the Dequant model."""
 
-    max_seq_len: int = 256  # maximum number of sequences
+    max_seq_len: int = 128  # maximum number of sequences
     drums: DrumsConfig = field(default_factory=DrumsConfig)  # drum-specific configuration
     transformer: TransformerConfig = field(default_factory=TransformerConfig)  # transformer-specific configuration
 
@@ -69,6 +69,9 @@ class TrainConfig:
     device: Optional[str] = None  # "cpu", "cuda", "mps"
 
     learning_rate: float = 1e-4  # optimizer learning rate
+    weight_decay: float = 1e-4  # AdamW weight decay
+    lr_scheduler: str = "cosine"  # "none", "cosine", or "plateau"
+    lr_warmup_epochs: int = 3  # linear warmup epochs before scheduler kicks in
     num_epochs: int = 100  # # maximum number of epochs to train for
     batch_size: int = 512  # number of samples per batch
 
