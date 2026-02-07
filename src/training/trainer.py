@@ -57,13 +57,18 @@ class Trainer:
         )
         self.loss_fn = torch.nn.MSELoss()
 
+        self.steps_per_epoch = len(self.train_set)
         self.scheduler = self._create_scheduler()
 
         self.epoch = 0
         self.global_step = 0
         self.best_val_loss = float("inf")
         self.patience_counter = 0
-        self.writer = SummaryWriter()
+        log_dir = None
+        if CONFIG.train.run_name:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_dir = f"runs/{timestamp}_{CONFIG.train.run_name}"
+        self.writer = SummaryWriter(log_dir=log_dir)
 
     def train_epoch(self):
         # Training
@@ -90,6 +95,10 @@ class Trainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+
+            # Step the learning rate scheduler (per step)
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             # Log training metrics
             self.writer.add_scalar("Loss/train", loss.item(), self.global_step)
@@ -149,13 +158,6 @@ class Trainer:
 
         logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Val loss: {avg_loss:.6f} (best: {self.best_val_loss:.6f}, patience: {self.patience_counter})")
 
-        # Step the learning rate scheduler
-        if self.scheduler is not None:
-            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                self.scheduler.step(avg_loss)
-            else:
-                self.scheduler.step()
-
         self.epoch += 1
 
     def train(self):
@@ -188,26 +190,26 @@ class Trainer:
         name = CONFIG.train.lr_scheduler
         if name == "none":
             return None
-        elif name == "cosine":
+
+        warmup_steps = CONFIG.train.lr_warmup_epochs * self.steps_per_epoch
+        total_steps = CONFIG.train.num_epochs * self.steps_per_epoch
+
+        if name == "cosine":
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                self.optimizer, T_max=CONFIG.train.num_epochs - CONFIG.train.lr_warmup_epochs
-            )
-        elif name == "plateau":
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                self.optimizer, mode="min", factor=0.5, patience=3
+                self.optimizer, T_max=total_steps - warmup_steps
             )
         else:
-            raise ValueError(f"Unknown lr_scheduler: {name}")
+            raise ValueError(f"Unknown lr_scheduler: {name}. Supported: 'none', 'cosine'")
 
-        if CONFIG.train.lr_warmup_epochs > 0:
+        if warmup_steps > 0:
             warmup = torch.optim.lr_scheduler.LinearLR(
-                self.optimizer, start_factor=0.01, total_iters=CONFIG.train.lr_warmup_epochs
+                self.optimizer, start_factor=0.01, total_iters=warmup_steps
             )
-            if name == "plateau":
-                return warmup  # SequentialLR doesn't support ReduceLROnPlateau; just use warmup then step plateau manually
             scheduler = torch.optim.lr_scheduler.SequentialLR(
-                self.optimizer, schedulers=[warmup, scheduler], milestones=[CONFIG.train.lr_warmup_epochs]
+                self.optimizer, schedulers=[warmup, scheduler], milestones=[warmup_steps]
             )
+
+        logger.info(f"LR scheduler: {name}, warmup_steps={warmup_steps}, total_steps={total_steps}")
         return scheduler
 
     @staticmethod

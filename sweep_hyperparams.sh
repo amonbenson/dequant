@@ -36,9 +36,7 @@ echo ""
 declare -a EXPERIMENTS=(
     # d_model=256, n_heads=8
     # larger models
-    "d512_h8_l4|512|8|4|0.0|1e-5|128|50|3"
-    "d512_h16_l4|512|16|4|0.0|1e-5|128|50|3"
-
+    "LR_warmup_d256_h8_l4|256|8|4|0.0|1e-4|128|4|1"
 )
 
 # Optional: Limit number of epochs for quick testing
@@ -108,6 +106,7 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.batch-size=${BATCH_SIZE} \
         --config.train.num-epochs=${EPOCHS} \
         --config.train.lr-warmup-epochs=${WARMUP_EPOCHS} \
+        --config.train.run-name=${NAME} \
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
         --config.train.max-train-samples=25000 \
         --config.train.max-val-samples=5000 \
