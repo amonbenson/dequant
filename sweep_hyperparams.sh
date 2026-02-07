@@ -46,7 +46,7 @@ declare -a EXPERIMENTS=(
 
 # Optional: Limit number of epochs for quick testing
 # Uncomment the line below and adjust QUICK_EPOCHS to run shorter experiments
-# QUICK_EPOCHS=10
+QUICK_EPOCHS=3
 
 echo -e "${GREEN}Total experiments planned: ${#EXPERIMENTS[@]}${NC}"
 echo ""
@@ -110,7 +110,8 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.batch-size=${BATCH_SIZE} \
         --config.train.num-epochs=${EPOCHS} \
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
-        --config.train.resume=False \
+        --config.train.max-train-samples=28647 \
+        --config.train.max-val-samples=4349 \
         train"
 
     # Log the command

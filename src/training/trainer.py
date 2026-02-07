@@ -34,9 +34,9 @@ class Trainer:
 
         logger.info(f"Using device '{self.device}'")
 
-        self.train_set = self.create_dataloader(CONFIG.data.dir / "train")
-        self.test_set = self.create_dataloader(CONFIG.data.dir / "test")
-        self.validation_set = self.create_dataloader(CONFIG.data.dir / "validation")
+        self.train_set = self.create_dataloader(CONFIG.data.dir / "train", CONFIG.train.max_train_samples)
+        self.test_set = self.create_dataloader(CONFIG.data.dir / "test", CONFIG.train.max_test_samples)
+        self.validation_set = self.create_dataloader(CONFIG.data.dir / "validation", CONFIG.train.max_val_samples)
 
         self.model = DequantTransformer(
             DequantTransformerConfig(
@@ -171,7 +171,7 @@ class Trainer:
         self.writer.close()
 
     @staticmethod
-    def create_dataloader(dir: Path):
+    def create_dataloader(dir: Path, max_samples: Optional[int] = None):
         logger.info(f"Loading dataset '{dir}' ...")
 
         dataset = HOVEncoderDecoderDataset(
@@ -180,6 +180,7 @@ class Trainer:
                 seq_len=CONFIG.model.max_seq_len,
                 sample_stride=CONFIG.train.sample_stride,
                 filter_empty=False,
+                max_samples=max_samples,
             )
         )
         dataloader = DataLoader(

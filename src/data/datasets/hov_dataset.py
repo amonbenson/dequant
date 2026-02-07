@@ -16,12 +16,15 @@ class HOVDatasetConfig:
     seq_len: int = 128
     sample_stride: int = 1
     filter_empty: bool = False
+    max_samples: Optional[int] = None
 
     def __post_init__(self):
         if self.sample_stride <= 0:
             raise ValueError("sample_stride must be > 0")
         if self.seq_len <= 0:
             raise ValueError("seq_len must be > 0")
+        if self.max_samples is not None and self.max_samples <= 0:
+            raise ValueError("max_samples must be > 0")
 
 
 class HOVDataset(Dataset):
@@ -77,9 +80,16 @@ class HOVDataset(Dataset):
 
         # Calculate the number of sequences without actually generating them
         self._num_sequences = (len(self._data) - self.config.seq_len) // self.config.sample_stride + 1
-        logger.info(f"Dataset initialized with {self._num_sequences} sequences from raw data of length {len(self._data)}")
+
+        # Log dataset size with max_samples info if applicable
+        if self.config.max_samples is not None and self.config.max_samples < self._num_sequences:
+            logger.info(f"Dataset initialized with {self._num_sequences} sequences (limited to {self.config.max_samples}) from raw data of length {len(self._data)}")
+        else:
+            logger.info(f"Dataset initialized with {self._num_sequences} sequences from raw data of length {len(self._data)}")
 
     def __len__(self) -> int:
+        if self.config.max_samples is not None:
+            return min(self._num_sequences, self.config.max_samples)
         return self._num_sequences
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
