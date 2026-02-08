@@ -1,9 +1,10 @@
 from pathlib import Path
-
+import sys
+import os
+import subprocess
 import numpy as np
 
 from src.data.datasets.hov_dataset import HOVDataset, HOVDatasetConfig
-
 
 def create_dummy_hov(
     num_steps: int,
@@ -72,3 +73,29 @@ def compute_pos_enc(n_steps, steps_per_bar):
         ],
         axis=-1,
     ).astype(np.float32)
+
+
+def run_cli(cmd, cwd, timeout = 180):
+
+    if timeout == 0:
+        timeout = None
+
+    PYTHON = sys.executable
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+
+    return subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "src",
+            *cmd,
+            ],
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
