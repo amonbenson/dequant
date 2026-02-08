@@ -27,6 +27,7 @@ FileInfos = list[tuple[Path, int]]
 @dataclass
 class HOVConverterConfig:
     steps_per_beat: int = 4
+    max_seq_len: int = 256
     categories: list[DrumCategory] = field(default_factory=lambda: DEFAULT_DRUM_CATEGORIES)
     _category_lookup: np.ndarray = field(init=False)
     _category_reverse_lookup: np.ndarray = field(init=False)
@@ -65,7 +66,7 @@ class HOVConverter:
         return float(tempi[0])
 
     def positional_encoding(self, bar_idx: np.ndarray, pos_in_bar: np.ndarray, total_bars: int):
-        bar_phase = 2 * np.pi * bar_idx / total_bars  # one cycle over clip
+        bar_phase = 2 * np.pi * bar_idx / total_bars  # one full cycle over the fixed model horizon (max bars)
         beat_phase = 2 * np.pi * pos_in_bar / (self.config.steps_per_beat * 4)
 
         beat_sin = np.sin(beat_phase).astype(np.float32)
@@ -125,12 +126,15 @@ class HOVConverter:
         if n_grid_onsets % steps_per_bar != 0:
             n_grid_onsets += steps_per_bar - n_grid_onsets % steps_per_bar
 
-        # encode positions as pos_in_bar + bar_id (progress through the clip)
-        step_idx = np.arange(n_grid_onsets)
+        # Limit positional encoding length to the model’s maximum sequence length
+        # so that timing representations are consistent across clips of different durations
+        T = min(n_grid_onsets, self.config.max_seq_len)
+        step_idx = np.arange(T)
         pos_in_bar = step_idx % steps_per_bar  # 0..15 repeating
         bar_idx = step_idx // steps_per_bar
-        total_bars = max(1, n_grid_onsets // steps_per_bar)  # guardrail against division by zero
 
+        # total_bars - max_bars
+        total_bars = max(1, self.config.max_seq_len // steps_per_bar)  # guardrail against division by zero
         pos_enc = self.positional_encoding(bar_idx, pos_in_bar, total_bars)
 
         # snap to grid
