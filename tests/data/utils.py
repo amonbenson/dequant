@@ -1,14 +1,12 @@
-from pathlib import Path
-
-import sys
-
 import os
-
 import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
 
 from src.data.datasets.hov_dataset import HOVDataset, HOVDatasetConfig
+
 
 def create_dummy_hov(
     num_steps: int,
@@ -79,7 +77,7 @@ def compute_pos_enc(n_steps, steps_per_bar):
     ).astype(np.float32)
 
 
-def run_cli(cmd, cwd, timeout = 180):
+def run_cli(cmd, cwd, timeout=180):
 
     if timeout == 0:
         timeout = None
@@ -96,10 +94,10 @@ def run_cli(cmd, cwd, timeout = 180):
             "-m",
             "src",
             *cmd,
-            ],
-            cwd=cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        ],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )

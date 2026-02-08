@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from tempfile import TemporaryDirectory
 
 from tests.data.utils import run_cli
@@ -8,12 +7,11 @@ DESKTOP = Path.home() / "Desktop"
 save_log = False
 
 
-
 def test_preprocessing_cli():
     with TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
 
-        result = run_cli(["preprocess"], cwd=tmp_path, timeout=0) #0 for no timeout
+        result = run_cli(["preprocess"], cwd=tmp_path, timeout=0)  # 0 for no timeout
 
         if save_log is True:
             log_file = DESKTOP / "dequant_cli_preprocess_test.txt"
@@ -34,5 +32,3 @@ def test_preprocessing_cli():
         # check if there is files
         files = list(data_dir.rglob("*"))
         assert len(files) > 0, "preprocessing did not generate HOV files"
-
-
