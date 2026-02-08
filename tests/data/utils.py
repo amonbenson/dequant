@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -72,3 +75,29 @@ def compute_pos_enc(n_steps, steps_per_bar, max_seq_len):
         ],
         axis=-1,
     ).astype(np.float32)
+
+
+def run_cli(cmd, cwd, timeout=180):
+
+    if timeout == 0:
+        timeout = None
+
+    PYTHON = sys.executable
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+
+    return subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "src",
+            *cmd,
+        ],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
