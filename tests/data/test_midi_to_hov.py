@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-#from IPython.lib.pretty import MAX_SEQ_LENGTH
+# from IPython.lib.pretty import MAX_SEQ_LENGTH
 from pretty_midi import Instrument, Note, PrettyMIDI
 
 from src.data import DrumCategory, HOVConverter, HOVConverterConfig

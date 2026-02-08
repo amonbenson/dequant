@@ -24,6 +24,7 @@ def test_dummy_pos_encoding_properties():
     assert np.allclose(pos[0:16, 2:4], pos[0, 2:4], atol=1e-6)
     assert np.allclose(pos[16:32, 2:4], pos[16, 2:4], atol=1e-6)
 
+
 def test_bar_encoding_independent_of_clip_length():
     steps_per_bar = 16
     max_seq_len = 128

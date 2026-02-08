@@ -133,8 +133,8 @@ class HOVConverter:
         pos_in_bar = step_idx % steps_per_bar  # 0..15 repeating
         bar_idx = step_idx // steps_per_bar
 
-        #total_bars - max_bars
-        total_bars = max(1,  self.config.max_seq_len // steps_per_bar)  #guardrail against division by zero
+        # total_bars - max_bars
+        total_bars = max(1, self.config.max_seq_len // steps_per_bar)  # guardrail against division by zero
         pos_enc = self.positional_encoding(bar_idx, pos_in_bar, total_bars)
 
         # snap to grid
