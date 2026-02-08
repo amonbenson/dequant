@@ -15,6 +15,7 @@ def preprocess_egmd():
         HOVConverterConfig(
             steps_per_beat=CONFIG.model.drums.steps_per_beat,
             categories=CONFIG.model.drums.categories,
+            max_seq_len=CONFIG.model.max_seq_len
         )
     )
 

@@ -2,7 +2,7 @@ from tempfile import TemporaryFile
 
 import mido
 import numpy as np
-
+from src.config import CONFIG
 from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
 REDUCED_DRUM_CATEGORIES = [
@@ -17,7 +17,9 @@ TICKS_PER_STEP = 480 / 4
 
 
 def convert(hov: np.ndarray) -> mido.MidiFile:
-    config = HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES)
+    config = HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES, max_seq_len=CONFIG.model.max_seq_len)
+
+   # config = HOVConverterConfig(categories=REDUCED_DRUM_CATEGORIES)
     converter = HOVConverter(config)
     pmidi = converter.hov_to_midi(hov, 120)
 
