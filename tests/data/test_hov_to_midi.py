@@ -2,6 +2,7 @@ from tempfile import TemporaryFile
 
 import mido
 import numpy as np
+
 from src.config import CONFIG
 from src.data import DrumCategory, HOVConverter, HOVConverterConfig
 
