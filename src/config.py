@@ -70,7 +70,7 @@ class TrainConfig:
     run_name: Optional[str] = None  # name for this run, used in TensorBoard log dir (e.g. "runs/<timestamp>_<run_name>")
 
     learning_rate: float = 1e-4  # optimizer learning rate
-    weight_decay: float = 1e-4  # AdamW weight decay
+    weight_decay: float = 1e-5  # AdamW weight decay
     lr_scheduler: str = "cosine"  # "none" or "cosine"
     lr_warmup_epochs: int = 3  # linear warmup epochs before scheduler kicks in
     num_epochs: int = 100  # # maximum number of epochs to train for
@@ -88,7 +88,7 @@ class TrainConfig:
     resume_from: Optional[Path] = None  # path to the checkpoint to resume from. If not provided, use the latest
     checkpoint_dir: Path = Path(".data/checkpoints")  # where to store checkpoints
     save_every_n_epochs: int = 1  # how often to store checkpoints
-    early_stopping_patience: int = 10  # stop after N epochs without improvement. 0 = disabled
+    early_stopping_patience: int = 5  # stop after N epochs without improvement. 0 = disabled
 
 
 @dataclass

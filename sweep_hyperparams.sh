@@ -34,14 +34,13 @@ echo ""
 # Define experiments as an array
 # Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs"
 declare -a EXPERIMENTS=(
-    # d_model=256, n_heads=8
-    # larger models
-    "LR_warmup_d256_h8_l4|256|8|4|0.0|1e-4|128|4|1"
+
+    "full_d128_h2_l1|128|2|1|0.0|5e-5|64|30|3"
 )
 
 # Optional: Limit number of epochs for quick testing
 # Uncomment the line below and adjust QUICK_EPOCHS to run shorter experiments
-QUICK_EPOCHS=4
+# QUICK_EPOCHS=4
 
 echo -e "${GREEN}Total experiments planned: ${#EXPERIMENTS[@]}${NC}"
 echo ""
@@ -108,11 +107,12 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.lr-warmup-epochs=${WARMUP_EPOCHS} \
         --config.train.run-name=${NAME} \
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
-        --config.train.max-train-samples=25000 \
-        --config.train.max-val-samples=5000 \
+
         --config.train.no-auto-preprocess \
         train"
 
+        # --config.train.max-train-samples=200000 \
+        # --config.train.max-val-samples=40000 \
     # Log the command
     echo -e "${GREEN}Running:${NC} ${TRAIN_CMD}"
     echo ""
