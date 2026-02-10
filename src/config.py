@@ -77,7 +77,7 @@ class TrainConfig:
     batch_size: int = 512  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training
-    sample_stride: int = 7  # 3  # offset in which sample sequences are taken from the dataset
+    sample_stride: int = 1  # 3  # offset in which sample sequences are taken from the dataset
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     max_train_samples: Optional[int] = None  # limit number of training sequences. None = use all
