@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint
 
+from src.data.converters.hov_converter import HOVConverter
+
 from .decoder import Decoder, DecoderConfig
 from .encoder import Encoder, EncoderConfig
 
@@ -29,7 +31,7 @@ class DequantTransformer(nn.Module):
         d_model = config.d_model
         dropout = config.dropout
 
-        self.pos_proj = nn.Linear(4, d_model)
+        self.pos_proj = nn.Linear(HOVConverter.POS_ENC_SIZE, d_model)
 
         # Input projections
         self.encoder_input_proj = nn.Linear(d_encoder_input, d_model)
@@ -71,7 +73,7 @@ class DequantTransformer(nn.Module):
         # PE
         assert pos_enc.dtype == torch.float32
         assert pos_enc.shape[:2] == (batch_size, seq_len)
-        assert pos_enc.shape[2] == 4
+        assert pos_enc.shape[2] == HOVConverter.POS_ENC_SIZE
 
         # Flatten instrument dimension
         encoder_flat = encoder_input.flatten(start_dim=2)  # this is a nop, but we might add other info later

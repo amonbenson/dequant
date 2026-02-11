@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from src.data.converters.hov_converter import HOVConverter
+
 logger = logging.getLogger("hov_dataset")
 
 
@@ -62,13 +64,13 @@ class HOVDataset(Dataset):
             # Pre-allocate final tensors and fill from chunks
             num_instruments = all_data_chunks[0].shape[1]
             self._data = torch.empty(total_len, num_instruments, 3, dtype=torch.float32)
-            self._pos_enc = torch.empty(total_len, 4, dtype=torch.float32)
+            self._pos_enc = torch.empty(total_len, HOVConverter.POS_ENC_SIZE, dtype=torch.float32)
 
             offset = 0
             for data_arr, pos_arr in zip(all_data_chunks, all_pos_chunks):
                 n = data_arr.shape[0]
-                self._data[offset:offset + n] = torch.from_numpy(data_arr.astype(np.float32, copy=False))
-                self._pos_enc[offset:offset + n] = torch.from_numpy(pos_arr.astype(np.float32, copy=False))
+                self._data[offset : offset + n] = torch.from_numpy(data_arr.astype(np.float32, copy=False))
+                self._pos_enc[offset : offset + n] = torch.from_numpy(pos_arr.astype(np.float32, copy=False))
                 offset += n
             del all_data_chunks, all_pos_chunks
 

@@ -39,6 +39,8 @@ class HOVConverterConfig:
 
 
 class HOVConverter:
+    POS_ENC_SIZE = 10  # 2 for beat position + 8 for bar position (4 sin + 4 cos) = 10 total dimensions for positional encoding
+
     def __init__(self, config: HOVConverterConfig):
         self.config = config
 
@@ -65,16 +67,34 @@ class HOVConverter:
 
         return float(tempi[0])
 
-    def positional_encoding(self, bar_idx: np.ndarray, pos_in_bar: np.ndarray, total_bars: int):
-        bar_phase = 2 * np.pi * bar_idx / total_bars  # one full cycle over the fixed model horizon (max bars)
+    def positional_encoding(self, bar_idx: np.ndarray, pos_in_bar: np.ndarray):
         beat_phase = 2 * np.pi * pos_in_bar / (self.config.steps_per_beat * 4)
+
+        bar_scales = self.config.max_seq_len / np.array([64, 16, 4, 1])
+        bar_phases = 2 * np.pi * bar_idx[:, np.newaxis] / bar_scales
 
         beat_sin = np.sin(beat_phase).astype(np.float32)
         beat_cos = np.cos(beat_phase).astype(np.float32)
-        bar_sin = np.sin(bar_phase).astype(np.float32)
-        bar_cos = np.cos(bar_phase).astype(np.float32)
+        bar_sin = np.sin(bar_phases).astype(np.float32)
+        bar_cos = np.cos(bar_phases).astype(np.float32)
 
-        return np.stack([beat_sin, beat_cos, bar_sin, bar_cos], axis=-1)  # shape: (T, 4)
+        # Interleave bar sin and cos components to create a combined bar encoding
+        bar_encodings = np.stack([bar_sin, bar_cos], axis=-1).reshape(len(bar_idx), -1)
+
+        # Combine beat and bar encodings into a single positional encoding matrix
+        merged_encodings = np.concatenate(
+            [
+                beat_sin[:, np.newaxis],
+                beat_cos[:, np.newaxis],
+                bar_encodings,
+            ],
+            axis=-1,
+        )
+
+        # Small self-check so we don't spit out incorrectly shaped encodings without noticing
+        assert merged_encodings.shape == (len(bar_idx), self.POS_ENC_SIZE)
+
+        return merged_encodings
 
     def midi_to_hov(self, midi: Path | PrettyMIDI, tempo_bpm: Optional[int] = None):
         midi_data = self._as_pretty_midi(midi)
@@ -126,16 +146,12 @@ class HOVConverter:
         if n_grid_onsets % steps_per_bar != 0:
             n_grid_onsets += steps_per_bar - n_grid_onsets % steps_per_bar
 
-        # Limit positional encoding length to the model’s maximum sequence length
-        # so that timing representations are consistent across clips of different durations
-        T = min(n_grid_onsets, self.config.max_seq_len)
-        step_idx = np.arange(T)
+        step_idx = np.arange(n_grid_onsets)
         pos_in_bar = step_idx % steps_per_bar  # 0..15 repeating
         bar_idx = step_idx // steps_per_bar
 
-        # total_bars - max_bars
-        total_bars = max(1, self.config.max_seq_len // steps_per_bar)  # guardrail against division by zero
-        pos_enc = self.positional_encoding(bar_idx, pos_in_bar, total_bars)
+        # calculate positional encoding for the whole sequence
+        pos_enc = self.positional_encoding(bar_idx, pos_in_bar)
 
         # snap to grid
         nearest_idc = np.rint(onsets * steps_ps).astype(np.int32)  # get snapped onsets as grid indices

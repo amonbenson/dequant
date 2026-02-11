@@ -82,7 +82,7 @@ class Predictor:
         pos_in_bar = step_idx % self.config.model.drums.steps_per_beat
         bar_idx = step_idx // self.config.model.drums.steps_per_beat
 
-        self._pos_enc = torch.from_numpy(self.converter.positional_encoding(bar_idx, pos_in_bar, self._max_seq_len))
+        self._pos_enc = torch.from_numpy(self.converter.positional_encoding(bar_idx, pos_in_bar))
 
     def _adjust_capacity(self):
         if self._playhead_position > 16000:
