@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -54,12 +57,12 @@ def create_dummy_pos_enc(num_steps: int, *, seed: int = 24601) -> np.ndarray:
     return rng.uniform(low=-1.0, high=1.0, size=(num_steps, 4)).astype(np.float32)
 
 
-def compute_pos_enc(n_steps, steps_per_bar):
+def compute_pos_enc(n_steps, steps_per_bar, max_seq_len):
     step_idx = np.arange(n_steps)
     pos_in_bar = step_idx % steps_per_bar
     bar_idx = step_idx // steps_per_bar
 
-    total_bars = max(1, n_steps // steps_per_bar)
+    total_bars = max(1, max_seq_len // steps_per_bar)
     beat_phase = 2 * np.pi * pos_in_bar / steps_per_bar
     bar_phase = 2 * np.pi * bar_idx / total_bars
 
@@ -72,3 +75,29 @@ def compute_pos_enc(n_steps, steps_per_bar):
         ],
         axis=-1,
     ).astype(np.float32)
+
+
+def run_cli(cmd, cwd, timeout=180):
+
+    if timeout == 0:
+        timeout = None
+
+    PYTHON = sys.executable
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+
+    return subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "src",
+            *cmd,
+        ],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
