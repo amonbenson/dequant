@@ -32,15 +32,14 @@ echo -e "${YELLOW}Sweep ID: ${SWEEP_ID}${NC}"
 echo ""
 
 # Define experiments as an array
-# Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs|sample_stride"
+# Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs|sample_stride|weight_decay"
 declare -a EXPERIMENTS=(
-    # Sweep over sample stride
-"d128_h2_l1|128|2|1|0.0|5e-5|1024|30|3|1"
-"d128_h2_l1|128|2|1|0.0|5e-5|1024|30|3|3"
-"d128_h2_l1|128|2|1|0.0|5e-5|1024|30|3|7"
-"d128_h2_l1|128|2|1|0.0|5e-5|1024|30|3|8"
-"d128_h2_l1|128|2|1|0.0|5e-5|1024|30|3|9"
-"d128_h2_l1|128|2|1|0.0|5e-5|1024|30|3|15"
+    # Sweep over weight decay
+"1e-5_d128_h2_l1|128|2|1|0.0|5e-5|1024|100|5|32|1e-5"
+"1e-4_d128_h2_l1|128|2|1|0.0|5e-5|1024|100|5|32|1e-4"
+"1e-3_d128_h2_l1|128|2|1|0.0|5e-5|1024|100|5|32|1e-3"
+"1e-2_d128_h2_l1|128|2|1|0.0|5e-5|1024|100|5|32|1e-2"
+
 )
 
 # Optional: Limit number of epochs for quick testing
@@ -72,7 +71,7 @@ for i in "${!EXPERIMENTS[@]}"; do
     EXP="${EXPERIMENTS[$i]}"
 
     # Parse experiment parameters
-    IFS='|' read -r NAME D_MODEL N_HEADS N_LAYERS DROPOUT LR BATCH_SIZE EPOCHS WARMUP_EPOCHS SAMPLE_STRIDE <<< "$EXP"
+    IFS='|' read -r NAME D_MODEL N_HEADS N_LAYERS DROPOUT LR BATCH_SIZE EPOCHS WARMUP_EPOCHS SAMPLE_STRIDE WEIGHT_DECAY <<< "$EXP"
 
     # Override epochs for quick testing if QUICK_EPOCHS is set
     if [ ! -z "$QUICK_EPOCHS" ]; then
@@ -95,6 +94,7 @@ for i in "${!EXPERIMENTS[@]}"; do
     echo -e "num_epochs:    ${EPOCHS}"
     echo -e "warmup_epochs: ${WARMUP_EPOCHS}"
     echo -e "sample_stride: ${SAMPLE_STRIDE}"
+    echo -e "weight_decay:  ${WEIGHT_DECAY}"
     echo ""
 
     # Create experiment-specific checkpoint directory
@@ -112,6 +112,7 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.num-epochs=${EPOCHS} \
         --config.train.lr-warmup-epochs=${WARMUP_EPOCHS} \
         --config.train.sample-stride=${SAMPLE_STRIDE} \
+        --config.train.weight-decay=${WEIGHT_DECAY} \
         --config.train.run-name=${NAME} \
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
 
