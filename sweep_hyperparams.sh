@@ -34,17 +34,13 @@ echo ""
 # Define experiments as an array
 # Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs|sample_stride|weight_decay"
 declare -a EXPERIMENTS=(
-    # Sweep over weight decay
+    # More layers
 
-    "d64_h1_l1|64|1|1|0.0|5e-5|1024|100|5|32|1e-4"
-    "d64_h2_l1|64|2|1|0.0|5e-5|1024|1100|5|32|1e-4"
-    "d128_h2_l1|128|2|1|0.0|5e-5|1024|1100|5|32|1e-4"
-    "d128_h2_l2|128|2|2|0.0|5e-5|1024|100|5|32|1e-4"
-    "d128_h4_l2|128|4|2|0.0|5e-5|1024|100|5|32|1e-4"
-    "d256_h2_l1|1256|2|1|0.0|5e-5|1024|100|5|32|1e-4"
-    "d256_h4_l2|256|4|2|0.0|5e-5|1024|100|5|32|1e-4"
-    "d256_h8_l4|256|8|4|0.0|5e-5|1024|100|5|32|1e-4"
-    "d512_h8_l4|512|8|4|0.0|5e-5|1024|100|5|32|1e-4"
+    "d64_h2_l2|64|2|2|0.0|5e-5|1024|100|5|32|1e-4"
+    "d64_h2_l3|64|2|3|0.0|5e-5|1024|100|5|32|1e-4"
+    "d128_h2_l3|128|2|3|0.0|5e-5|1024|100|5|32|1e-4"
+    "d128_h2_l4|128|2|4|0.0|5e-5|1024|100|5|32|1e-4"
+    
 )
 
 # Optional: Limit number of epochs for quick testing
