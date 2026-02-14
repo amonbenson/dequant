@@ -44,10 +44,7 @@ class Predictor:
             )
 
         self.converter = HOVConverter(
-            HOVConverterConfig(
-                steps_per_beat=self.config.model.drums.steps_per_beat,
-                categories=self.config.model.drums.categories,
-            )
+            HOVConverterConfig(steps_per_beat=self.config.model.drums.steps_per_beat, categories=self.config.model.drums.categories, max_seq_len=config.model.max_seq_len)
         )
 
         self._max_seq_len = self.config.model.max_seq_len
