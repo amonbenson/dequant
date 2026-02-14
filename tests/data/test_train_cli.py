@@ -42,8 +42,9 @@ def test_train_cli():
         assert proc.stdout is not None
 
         try:
+
             for line in proc.stdout:
-                print(line)
+                #print(line)
 
                 if "Epoch" in line or "%" in line:
                     triggered = True
@@ -54,7 +55,10 @@ def test_train_cli():
                     break
 
         finally:
+
             proc.kill()
             proc.wait()
 
         assert triggered is True, "Training progress bar did not start"
+
+        
