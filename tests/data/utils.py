@@ -76,7 +76,7 @@ def compute_pos_enc(n_steps, steps_per_bar):
         axis=-1,
     ).astype(np.float32)
 
-
+#run_cli
 def run_cli(cmd, cwd, timeout=180):
 
     if timeout == 0:
@@ -101,3 +101,27 @@ def run_cli(cmd, cwd, timeout=180):
         text=True,
         timeout=timeout,
     )
+
+#run_cli_popen
+
+def run_cli_popen(cmd, cwd):
+
+    PYTHON = sys.executable
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+
+    return subprocess.Popen(
+        [PYTHON, "-u", "-m", "src", *cmd],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=env,
+        text=True,
+        bufsize=1
+
+    )
+
+
+    
