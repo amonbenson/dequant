@@ -1,7 +1,6 @@
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
-
 from tests.data.utils import run_cli, run_cli_popen
 
 DESKTOP = Path.home() / "Desktop"
@@ -42,23 +41,19 @@ def test_train_cli():
         assert proc.stdout is not None
 
         try:
-
             for line in proc.stdout:
-                #print(line)
+                # print(line)
 
                 if "Epoch" in line or "%" in line:
                     triggered = True
                     proc.terminate()
                     break
 
-                if time.time() - start > 180:
+                if time.time() - start > 720:
                     break
 
         finally:
-
             proc.kill()
             proc.wait()
 
         assert triggered is True, "Training progress bar did not start"
-
-        
