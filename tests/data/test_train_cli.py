@@ -49,7 +49,7 @@ def test_train_cli():
                     proc.terminate()
                     break
 
-                if time.time() - start > 720:
+                if time.time() - start > 700:
                     break
 
         finally:

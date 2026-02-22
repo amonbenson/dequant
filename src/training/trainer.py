@@ -1,12 +1,13 @@
 import logging
 import multiprocessing
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import torch
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
 
 from ..config import CONFIG
@@ -62,7 +63,7 @@ class Trainer:
         self.model.train()
 
         # Show a progress bar
-        pbar = tqdm(self.train_set, desc=f"Epoch {self.epoch}", mininterval=0.1)
+        pbar = tqdm(self.train_set, desc=f"Epoch {self.epoch}", mininterval=0.1, file=sys.stdout, disable=False, leave=False)
 
         # Start training batches
         for encoder_input, decoder_input, decoder_target, pos_enc in pbar:
