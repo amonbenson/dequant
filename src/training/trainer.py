@@ -64,6 +64,7 @@ class Trainer:
 
         # Show a progress bar
         pbar = tqdm(self.train_set, desc=f"Epoch {self.epoch}", mininterval=0.1, file=sys.stdout, disable=False, leave=False)
+        print(f"[TRAIN] Epoch {self.epoch} started", flush=True)
 
         # Start training batches
         for encoder_input, decoder_input, decoder_target, pos_enc in pbar:

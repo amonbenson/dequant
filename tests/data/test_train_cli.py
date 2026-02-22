@@ -43,9 +43,9 @@ def test_train_cli():
 
         try:
             for line in proc.stdout:
-                # print(line)
+                print(line)
 
-                if "Epoch" in line or "%" in line:
+                if "[TRAIN] Epoch" in line or "%" in line:
                     triggered = True
                     proc.terminate()
                     break
