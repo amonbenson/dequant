@@ -1,6 +1,7 @@
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
 from tests.data.utils import run_cli, run_cli_popen
 
 DESKTOP = Path.home() / "Desktop"
