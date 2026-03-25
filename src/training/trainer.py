@@ -46,6 +46,7 @@ class Trainer:
                 n_heads=CONFIG.model.transformer.n_heads,
                 n_layers=CONFIG.model.transformer.n_layers,
                 dropout=CONFIG.model.transformer.dropout,
+                activation_fn_enabled=CONFIG.model.transformer.use_activation,
             )
         )
         self.model = self.model.to(self.device)

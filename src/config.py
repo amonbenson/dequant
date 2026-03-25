@@ -51,6 +51,7 @@ class TransformerConfig:
     n_heads: int = 2  # number of attention heads
     n_layers: int = 5  # number of encoder/decoder layers
     dropout: float = 0.0  # dropout for all layers
+    use_activation: bool = True  # enable the output activation functions (tanh for offsets and sigmoid for velocities)
 
 
 @dataclass

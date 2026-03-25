@@ -33,6 +33,7 @@ class Predictor:
                 n_heads=self.config.model.transformer.n_heads,
                 n_layers=self.config.model.transformer.n_layers,
                 dropout=self.config.model.transformer.dropout,
+                activation_fn_enabled=self.config.model.transformer.use_activation,
             )
         )
 

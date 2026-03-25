@@ -16,6 +16,7 @@ class DequantTransformerConfig:
     n_heads: int = 1
     n_layers: int = 1
     dropout: float = 0.2
+    activation_fn_enabled: bool = True
 
 
 class DequantTransformer(nn.Module):
@@ -102,8 +103,12 @@ class DequantTransformer(nn.Module):
 
         # Apply different activations to hits, offsets, and velocities
         # hits: torch.Tensor = self.sigmoid(y[..., 0:1])
-        offsets: torch.Tensor = 0.5 * self.tanh(y[..., 0:1])
-        velocities: torch.Tensor = self.sigmoid(y[..., 1:2])
+        if self.config.activation_fn_enabled:
+            offsets: torch.Tensor = 0.5 * self.tanh(y[..., 0:1])
+            velocities: torch.Tensor = self.sigmoid(y[..., 1:2])
+        else:
+            offsets: torch.Tensor = y[..., 0:1]
+            velocities: torch.Tensor = y[..., 1:2]
 
         # Concatenate along last dimension
         return torch.cat([offsets, velocities], dim=-1)

@@ -32,10 +32,10 @@ echo -e "${YELLOW}Sweep ID: ${SWEEP_ID}${NC}"
 echo ""
 
 # Define experiments as an array
-# Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs"
+# Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs|use_activation"
 declare -a EXPERIMENTS=(
-
-    "full_d128_h2_l1|128|2|1|0.0|5e-5|64|30|3"
+    "without_activations_d128_h2_l5|128|2|5|0.0|5e-5|64|5|3|n"
+    "with_activations_d128_h2_l5|128|2|5|0.0|5e-5|64|5|3|y"
 )
 
 # Optional: Limit number of epochs for quick testing
@@ -67,7 +67,7 @@ for i in "${!EXPERIMENTS[@]}"; do
     EXP="${EXPERIMENTS[$i]}"
 
     # Parse experiment parameters
-    IFS='|' read -r NAME D_MODEL N_HEADS N_LAYERS DROPOUT LR BATCH_SIZE EPOCHS WARMUP_EPOCHS <<< "$EXP"
+    IFS='|' read -r NAME D_MODEL N_HEADS N_LAYERS DROPOUT LR BATCH_SIZE EPOCHS WARMUP_EPOCHS USE_ACTIVATION <<< "$EXP"
 
     # Override epochs for quick testing if QUICK_EPOCHS is set
     if [ ! -z "$QUICK_EPOCHS" ]; then
@@ -89,11 +89,19 @@ for i in "${!EXPERIMENTS[@]}"; do
     echo -e "batch_size:    ${BATCH_SIZE}"
     echo -e "num_epochs:    ${EPOCHS}"
     echo -e "warmup_epochs: ${WARMUP_EPOCHS}"
+    echo -e "use_activation: ${USE_ACTIVATION}"
     echo ""
 
     # Create experiment-specific checkpoint directory
     EXP_CHECKPOINT_DIR="${CHECKPOINT_BASE_DIR}/sweep_${SWEEP_ID}/${NAME}"
     mkdir -p "$EXP_CHECKPOINT_DIR"
+
+    # Build activation flag
+    if [[ $USE_ACTIVATION =~ ^[Yy]$ ]]; then
+        ACTIVATION_FLAG="--config.model.transformer.use-activation"
+    else
+        ACTIVATION_FLAG="--config.model.transformer.no-use-activation"
+    fi
 
     # Build the training command
     TRAIN_CMD="${PYTHON_CMD} \
@@ -107,6 +115,7 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.lr-warmup-epochs=${WARMUP_EPOCHS} \
         --config.train.run-name=${NAME} \
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
+        ${ACTIVATION_FLAG} \
 
         --config.train.no-auto-preprocess \
         --config.train.no-resume \
