@@ -13,7 +13,17 @@ logger = logging.getLogger("checkpoint")
 
 class Checkpoint:
     @staticmethod
-    def save(filename: Path, *, config: RootConfig, epoch: int, global_step: int, model: nn.Module, optimizer: torch.optim.Optimizer, loss_fn: nn.Module, best_val_loss: float = float("inf")):
+    def save(
+        filename: Path,
+        *,
+        config: RootConfig,
+        epoch: int,
+        global_step: int,
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        loss_fn: nn.Module,
+        best_val_loss: float = float("inf"),
+    ):
         # Store the file in the provided directory
         logger.info(f"Saving checkpoint to {filename} ...")
         filename.parent.mkdir(parents=True, exist_ok=True)

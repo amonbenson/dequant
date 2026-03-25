@@ -67,8 +67,8 @@ class HOVDataset(Dataset):
             offset = 0
             for data_arr, pos_arr in zip(all_data_chunks, all_pos_chunks):
                 n = data_arr.shape[0]
-                self._data[offset:offset + n] = torch.from_numpy(data_arr.astype(np.float32, copy=False))
-                self._pos_enc[offset:offset + n] = torch.from_numpy(pos_arr.astype(np.float32, copy=False))
+                self._data[offset : offset + n] = torch.from_numpy(data_arr.astype(np.float32, copy=False))
+                self._pos_enc[offset : offset + n] = torch.from_numpy(pos_arr.astype(np.float32, copy=False))
                 offset += n
             del all_data_chunks, all_pos_chunks
 

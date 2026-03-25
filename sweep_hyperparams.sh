@@ -109,6 +109,7 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
 
         --config.train.no-auto-preprocess \
+        --config.train.no-resume \
         train"
 
         # --config.train.max-train-samples=200000 \

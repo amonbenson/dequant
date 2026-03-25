@@ -195,19 +195,13 @@ class Trainer:
         total_steps = CONFIG.train.num_epochs * self.steps_per_epoch
 
         if name == "cosine":
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                self.optimizer, T_max=total_steps - warmup_steps
-            )
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=total_steps - warmup_steps)
         else:
             raise ValueError(f"Unknown lr_scheduler: {name}. Supported: 'none', 'cosine'")
 
         if warmup_steps > 0:
-            warmup = torch.optim.lr_scheduler.LinearLR(
-                self.optimizer, start_factor=0.01, total_iters=warmup_steps
-            )
-            scheduler = torch.optim.lr_scheduler.SequentialLR(
-                self.optimizer, schedulers=[warmup, scheduler], milestones=[warmup_steps]
-            )
+            warmup = torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=0.01, total_iters=warmup_steps)
+            scheduler = torch.optim.lr_scheduler.SequentialLR(self.optimizer, schedulers=[warmup, scheduler], milestones=[warmup_steps])
 
         logger.info(f"LR scheduler: {name}, warmup_steps={warmup_steps}, total_steps={total_steps}")
         return scheduler

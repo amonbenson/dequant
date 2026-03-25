@@ -47,10 +47,10 @@ class DrumsConfig:
 class TransformerConfig:
     """Configuration for the transformer architecture."""
 
-    d_model: int = 32  # internal model depth
-    n_heads: int = 1  # number of attention heads
-    n_layers: int = 1  # number of encoder/decoder layers
-    dropout: float = 0.2  # dropout for all layers
+    d_model: int = 128  # internal model depth
+    n_heads: int = 2  # number of attention heads
+    n_layers: int = 5  # number of encoder/decoder layers
+    dropout: float = 0.0  # dropout for all layers
 
 
 @dataclass
@@ -69,22 +69,22 @@ class TrainConfig:
     device: Optional[str] = None  # "cpu", "cuda", "mps"
     run_name: Optional[str] = None  # name for this run, used in TensorBoard log dir (e.g. "runs/<timestamp>_<run_name>")
 
-    learning_rate: float = 1e-4  # optimizer learning rate
-    weight_decay: float = 1e-5  # AdamW weight decay
+    learning_rate: float = 5e-5  # optimizer learning rate
+    weight_decay: float = 1e-4  # AdamW weight decay
     lr_scheduler: str = "cosine"  # "none" or "cosine"
     lr_warmup_epochs: int = 3  # linear warmup epochs before scheduler kicks in
     num_epochs: int = 100  # # maximum number of epochs to train for
-    batch_size: int = 512  # number of samples per batch
+    batch_size: int = 64  # number of samples per batch
 
     auto_preprocess: bool = True  # always run preprocess before training
-    sample_stride: int = 7  # 3  # offset in which sample sequences are taken from the dataset
+    sample_stride: int = 80  # offset in which sample sequences are taken from the dataset. Use 128 / golden ratio ~= 80 for most balanced offsets
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     max_train_samples: Optional[int] = None  # limit number of training sequences. None = use all
     max_val_samples: Optional[int] = None  # limit number of validation sequences. None = use all
     max_test_samples: Optional[int] = None  # limit number of test sequences. None = use all
 
-    resume: bool = True  # resume training from a previously saved checkpoint
+    resume: bool = False  # resume training from a previously saved checkpoint
     resume_from: Optional[Path] = None  # path to the checkpoint to resume from. If not provided, use the latest
     checkpoint_dir: Path = Path(".data/checkpoints")  # where to store checkpoints
     save_every_n_epochs: int = 1  # how often to store checkpoints
