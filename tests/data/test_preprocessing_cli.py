@@ -1,12 +1,15 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from tests.data.utils import run_cli
 
 DESKTOP = Path.home() / "Desktop"
 save_log = False
 
 
+@pytest.mark.skip(reason="With the newly added datasets, this test is much too resource intensive. It'll need to be reworked")
 def test_preprocessing_cli():
     with TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)

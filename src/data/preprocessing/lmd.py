@@ -12,6 +12,8 @@ from .download import download_file, untar_file
 
 logger = logging.getLogger("lmd")
 
+BATCH_SIZE = 2000  # number of files to process before writing a batch .npz
+
 
 def _has_drum_track(path: Path) -> bool:
     """Fast check for drum content by scanning for MIDI channel 9 note_on bytes (0x99)."""
@@ -21,7 +23,7 @@ def _has_drum_track(path: Path) -> bool:
         return False
 
 
-def _find_drum_files(midi_files: list[Path], n_workers: int) -> list[Path]:
+def _find_drum_files(midi_files: list[Path], n_workers: int | None) -> list[Path]:
     """Scan MIDI files in parallel and return only those containing drum tracks."""
     drum_files = []
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
@@ -30,6 +32,30 @@ def _find_drum_files(midi_files: list[Path], n_workers: int) -> list[Path]:
             if future.result():
                 drum_files.append(futures[future])
     return sorted(drum_files)
+
+
+def _process_batch(converter: HOVConverter, files: list[Path], out_path: Path, n_workers: int):
+    """Convert a batch of MIDI files and save to a single .npz file."""
+    file_infos: FileInfos = [(path, None) for path in files]
+    results = converter.midi_to_hov_batch(file_infos, n_workers=n_workers)
+
+    hovs = []
+    pos_en = []
+    for item in results:
+        if item is None:
+            continue
+        hov, pos = item
+        if hov is None or pos is None:
+            continue
+        hovs.append(hov)
+        pos_en.append(pos)
+
+    np.savez_compressed(
+        out_path,
+        data=np.array(hovs, dtype=object),
+        pos_en=np.array(pos_en, dtype=object),
+    )
+    return len(hovs)
 
 
 def preprocess_lmd():
@@ -80,31 +106,20 @@ def preprocess_lmd():
         split_dir = CONFIG.data.dir / split_name
         split_dir.mkdir(parents=True, exist_ok=True)
 
-        data_filename = split_dir / "lmd.npz"
-        if data_filename.exists():
-            logger.info(f"Skipping '{data_filename}', already exists.")
-            continue
+        # Split files into batches and process each one independently
+        batches = [files[i : i + BATCH_SIZE] for i in range(0, len(files), BATCH_SIZE)]
+        logger.info(f"Processing split '{split_name}' ({len(files)} files, {len(batches)} batches)...")
 
-        # BPM is extracted from each MIDI file by the converter (tempo_bpm=None)
-        file_infos: FileInfos = [(path, None) for path in files]
-
-        logger.info(f"Processing split '{split_name}' ({len(files)} files)...")
-        results = converter.midi_to_hov_batch(file_infos, n_workers=CONFIG.data.num_workers)
-
-        hovs = []
-        pos_en = []
-        for item in results:
-            if item is None:
+        total_tracks = 0
+        for batch_idx, batch in enumerate(batches):
+            out_path = split_dir / f"lmd_{batch_idx:04d}.npz"
+            if out_path.exists():
+                logger.info(f"Skipping batch {batch_idx}, '{out_path}' already exists.")
                 continue
-            hov, pos = item
-            if hov is None or pos is None:
-                continue
-            hovs.append(hov)
-            pos_en.append(pos)
 
-        logger.info(f"Saving '{data_filename}' ({len(hovs)} tracks)...")
-        np.savez_compressed(
-            data_filename,
-            data=np.array(hovs, dtype=object),
-            pos_en=np.array(pos_en, dtype=object),
-        )
+            logger.info(f"Batch {batch_idx + 1}/{len(batches)} ({len(batch)} files)...")
+            n_saved = _process_batch(converter, batch, out_path, CONFIG.data.num_workers)
+            total_tracks += n_saved
+            logger.info(f"Saved {n_saved} tracks to '{out_path}'")
+
+        logger.info(f"Split '{split_name}' complete: {total_tracks} tracks saved across {len(batches)} files")
