@@ -15,6 +15,16 @@ class EGMDSourceConfig:
 
 
 @dataclass
+class LMDSourceConfig:
+    """Configuration for the Lakh MIDI Dataset source."""
+
+    enabled: bool = True  # use this dataset
+    url: str = "http://hog.ee.columbia.edu/craffel/lmd/lmd_full.tar.gz"
+    train_split: float = 0.8  # fraction of files used for training
+    val_split: float = 0.1  # fraction used for validation (remainder goes to test)
+
+
+@dataclass
 class DataConfig:
     """Configuration for data loading and preprocessing."""
 
@@ -26,6 +36,7 @@ class DataConfig:
 
     # Data sources
     egmd: EGMDSourceConfig = field(default_factory=EGMDSourceConfig)  # egmd configuration
+    lmd: LMDSourceConfig = field(default_factory=LMDSourceConfig)  # lmd configuration
 
 
 @dataclass
@@ -77,8 +88,8 @@ class TrainConfig:
     num_epochs: int = 100  # # maximum number of epochs to train for
     batch_size: int = 64  # number of samples per batch
 
-    auto_preprocess: bool = True  # always run preprocess before training
-    sample_stride: int = 80  # offset in which sample sequences are taken from the dataset. Use 128 / golden ratio ~= 80 for most balanced offsets
+    auto_preprocess: bool = False  # always run preprocess before training
+    sample_stride: int = 128  # offset in which sample sequences are taken from the dataset
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     max_train_samples: Optional[int] = None  # limit number of training sequences. None = use all

@@ -34,8 +34,8 @@ echo ""
 # Define experiments as an array
 # Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs|use_activation"
 declare -a EXPERIMENTS=(
-    "without_activations_d128_h2_l5|128|2|5|0.0|5e-5|64|5|3|n"
-    "with_activations_d128_h2_l5|128|2|5|0.0|5e-5|64|5|3|y"
+    "without_activations_d128_h2_l5|128|2|5|0.0|5e-5|64|30|3|n"
+    "with_activations_d128_h2_l5|128|2|5|0.0|5e-5|64|30|3|y"
 )
 
 # Optional: Limit number of epochs for quick testing

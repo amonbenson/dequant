@@ -7,7 +7,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,7 +20,7 @@ from ..drum_category import DEFAULT_DRUM_CATEGORIES, DrumCategory
 
 logger = logging.getLogger("hov_converter")
 
-FileInfos = list[tuple[Path, int]]
+FileInfos = list[tuple[Path, Optional[int]]]
 
 
 @dataclass
@@ -227,8 +226,7 @@ class HOVConverter:
                     result = future.result()
                     data.append((idx, result))
                 except Exception as e:
-                    logger.error(f"Error processing file at index {idx}: {e}")
-                    traceback.print_exc()
+                    logger.debug(f"Skipping file at index {idx}: {e}")
                     data.append((idx, (None, None)))  # as now HOVConverter returns tuple of (hov, pe)
 
         # Sort by original index to maintain order
