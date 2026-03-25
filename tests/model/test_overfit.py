@@ -40,7 +40,7 @@ def test_dequant_overfitting():
     )
 
     # Create model and a basic optimizer
-    model = DequantTransformer(DequantTransformerConfig(max_seq_len=4, num_instruments=2, d_model=128))
+    model = DequantTransformer(DequantTransformerConfig(max_seq_len=4, num_instruments=2, d_model=128, n_heads=4, n_layers=2))
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
 

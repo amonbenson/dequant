@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 
-import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 @dataclass
 class DecoderConfig:
     d_model: int
+    n_heads: int = 1
     dropout: float = 0.2
 
 
@@ -16,6 +17,9 @@ class Decoder(nn.Module):
         super().__init__()
         self.config = config
         d_model = config.d_model
+        n_heads = config.n_heads
+        assert d_model % n_heads == 0, f"d_model ({d_model}) must be divisible by n_heads ({n_heads})"
+        self.d_head = d_model // n_heads
 
         # Causal self-attention
         self.self_qkv_proj = nn.Linear(d_model, 3 * d_model)
@@ -46,7 +50,10 @@ class Decoder(nn.Module):
         self.resid_dropout3 = nn.Dropout(config.dropout)
 
     def forward(self, x: torch.Tensor, encoder_output: torch.Tensor) -> torch.Tensor:
-        _batch_size, seq_len, _ = x.shape
+        B, T, C = x.shape
+        T_enc = encoder_output.shape[1]
+        n_heads = self.config.n_heads
+        d_head = self.d_head
 
         # Causal self-attention on decoder sequence
         residual = x
@@ -55,13 +62,18 @@ class Decoder(nn.Module):
         qkv: torch.Tensor = self.self_qkv_proj(x)
         q, k, v = qkv.chunk(3, dim=-1)
 
-        attn: torch.Tensor = (q @ k.transpose(-2, -1)) / np.sqrt(self.config.d_model)
-        causal_mask = torch.triu(torch.ones(seq_len, seq_len, device=x.device), diagonal=1).bool()
-        attn = attn.masked_fill(causal_mask, float("-inf"))
-        attn = torch.softmax(attn, dim=-1)
-        attn = self.self_attn_dropout(attn)
+        q = q.view(B, T, n_heads, d_head).transpose(1, 2)  # (B, n_heads, T, d_head)
+        k = k.view(B, T, n_heads, d_head).transpose(1, 2)
+        v = v.view(B, T, n_heads, d_head).transpose(1, 2)
 
-        x = attn @ v
+        x = F.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            is_causal=True,
+            dropout_p=self.config.dropout if self.training else 0.0,
+        )  # (B, n_heads, T, d_head)
+        x = x.transpose(1, 2).contiguous().view(B, T, C)  # (B, T, C)
         x = self.self_attn_out(x)
         x = residual + self.resid_dropout1(x)
 
@@ -73,11 +85,17 @@ class Decoder(nn.Module):
         kv: torch.Tensor = self.cross_kv_proj(encoder_output)  # K, V from encoder
         k, v = kv.chunk(2, dim=-1)
 
-        attn = (q @ k.transpose(-2, -1)) / np.sqrt(self.config.d_model)
-        attn = torch.softmax(attn, dim=-1)
-        attn = self.cross_attn_dropout(attn)
+        q = q.view(B, T, n_heads, d_head).transpose(1, 2)
+        k = k.view(B, T_enc, n_heads, d_head).transpose(1, 2)
+        v = v.view(B, T_enc, n_heads, d_head).transpose(1, 2)
 
-        x = attn @ v
+        x = F.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            dropout_p=self.config.dropout if self.training else 0.0,
+        )  # (B, n_heads, T, d_head)
+        x = x.transpose(1, 2).contiguous().view(B, T, C)  # (B, T, C)
         x = self.cross_attn_out(x)
         x = residual + self.resid_dropout2(x)
 

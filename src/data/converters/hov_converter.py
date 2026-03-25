@@ -126,10 +126,9 @@ class HOVConverter:
         if n_grid_onsets % steps_per_bar != 0:
             n_grid_onsets += steps_per_bar - n_grid_onsets % steps_per_bar
 
-        # Limit positional encoding length to the model’s maximum sequence length
+        # Generate positional encoding for the full song, but repeat after max_seq_len steps
         # so that timing representations are consistent across clips of different durations
-        T = min(n_grid_onsets, self.config.max_seq_len)
-        step_idx = np.arange(T)
+        step_idx = np.arange(n_grid_onsets) % self.config.max_seq_len
         pos_in_bar = step_idx % steps_per_bar  # 0..15 repeating
         bar_idx = step_idx // steps_per_bar
 

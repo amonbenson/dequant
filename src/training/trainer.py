@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -35,26 +34,41 @@ class Trainer:
 
         logger.info(f"Using device '{self.device}'")
 
-        self.train_set = self.create_dataloader(CONFIG.data.dir / "train")
-        self.test_set = self.create_dataloader(CONFIG.data.dir / "test")
-        self.validation_set = self.create_dataloader(CONFIG.data.dir / "validation")
+        self.train_set = self.create_dataloader(CONFIG.data.dir / "train", CONFIG.train.max_train_samples)
+        self.test_set = self.create_dataloader(CONFIG.data.dir / "test", CONFIG.train.max_test_samples)
+        self.validation_set = self.create_dataloader(CONFIG.data.dir / "validation", CONFIG.train.max_val_samples)
 
         self.model = DequantTransformer(
             DequantTransformerConfig(
                 max_seq_len=CONFIG.model.max_seq_len,
                 num_instruments=CONFIG.model.drums.num_instruments,
                 d_model=CONFIG.model.transformer.d_model,
+                n_heads=CONFIG.model.transformer.n_heads,
+                n_layers=CONFIG.model.transformer.n_layers,
                 dropout=CONFIG.model.transformer.dropout,
             )
         )
         self.model = self.model.to(self.device)
 
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=CONFIG.train.learning_rate)
+        self.optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=CONFIG.train.learning_rate,
+            weight_decay=CONFIG.train.weight_decay,
+        )
         self.loss_fn = torch.nn.MSELoss()
+
+        self.steps_per_epoch = len(self.train_set)
+        self.scheduler = self._create_scheduler()
 
         self.epoch = 0
         self.global_step = 0
-        self.writer = SummaryWriter()
+        self.best_val_loss = float("inf")
+        self.patience_counter = 0
+        log_dir = None
+        if CONFIG.train.run_name:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_dir = f"runs/{timestamp}_{CONFIG.train.run_name}"
+        self.writer = SummaryWriter(log_dir=log_dir)
 
     def train_epoch(self):
         # Training
@@ -81,6 +95,10 @@ class Trainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+
+            # Step the learning rate scheduler (per step)
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             # Log training metrics
             self.writer.add_scalar("Loss/train", loss.item(), self.global_step)
@@ -123,13 +141,23 @@ class Trainer:
 
         # Calculate and log average validation loss
         avg_loss = total_loss / num_batches
-        self.writer.add_scalar("Loss/validation", avg_loss, self.epoch)
+        self.writer.add_scalar("Loss/validation", avg_loss, self.global_step)
 
-        # Save a checkpoint to the default path
+        # Best model tracking
+        if avg_loss < self.best_val_loss:
+            self.best_val_loss = avg_loss
+            self.patience_counter = 0
+            self.save_checkpoint(CONFIG.train.checkpoint_dir / "best.pt")
+            logger.info(f"New best validation loss: {avg_loss:.6f}")
+        else:
+            self.patience_counter += 1
+
+        # Save a periodic checkpoint
         if self.epoch % CONFIG.train.save_every_n_epochs == 0:
             self.save_checkpoint()
 
-        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Loss: {avg_loss:.6f}")
+        logger.info(f"Epoch {self.epoch + 1}/{CONFIG.train.num_epochs} - Val loss: {avg_loss:.6f} (best: {self.best_val_loss:.6f}, patience: {self.patience_counter})")
+
         self.epoch += 1
 
     def train(self):
@@ -149,11 +177,37 @@ class Trainer:
         while self.epoch < CONFIG.train.num_epochs:
             self.train_epoch()
 
+            # Early stopping
+            patience = CONFIG.train.early_stopping_patience
+            if patience > 0 and self.patience_counter >= patience:
+                logger.info(f"Early stopping: no improvement for {patience} epochs.")
+                break
+
         # Close the tensorboard writer
         self.writer.close()
 
+    def _create_scheduler(self):
+        name = CONFIG.train.lr_scheduler
+        if name == "none":
+            return None
+
+        warmup_steps = CONFIG.train.lr_warmup_epochs * self.steps_per_epoch
+        total_steps = CONFIG.train.num_epochs * self.steps_per_epoch
+
+        if name == "cosine":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=total_steps - warmup_steps)
+        else:
+            raise ValueError(f"Unknown lr_scheduler: {name}. Supported: 'none', 'cosine'")
+
+        if warmup_steps > 0:
+            warmup = torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=0.01, total_iters=warmup_steps)
+            scheduler = torch.optim.lr_scheduler.SequentialLR(self.optimizer, schedulers=[warmup, scheduler], milestones=[warmup_steps])
+
+        logger.info(f"LR scheduler: {name}, warmup_steps={warmup_steps}, total_steps={total_steps}")
+        return scheduler
+
     @staticmethod
-    def create_dataloader(dir: Path):
+    def create_dataloader(dir: Path, max_samples: Optional[int] = None):
         logger.info(f"Loading dataset '{dir}' ...")
 
         dataset = HOVEncoderDecoderDataset(
@@ -162,6 +216,7 @@ class Trainer:
                 seq_len=CONFIG.model.max_seq_len,
                 sample_stride=CONFIG.train.sample_stride,
                 filter_empty=False,
+                max_samples=max_samples,
             )
         )
         dataloader = DataLoader(
@@ -169,8 +224,7 @@ class Trainer:
             batch_size=CONFIG.train.batch_size,
             shuffle=CONFIG.train.sample_shuffle,
             pin_memory=True if torch.cuda.is_available() else False,
-            num_workers=multiprocessing.cpu_count(),  # Adjust based on your CPU cores
-            persistent_workers=True,  # Keep workers alive between epochs
+            num_workers=0,
         )
         return dataloader
 
@@ -189,6 +243,7 @@ class Trainer:
             model=self.model,
             optimizer=self.optimizer,
             loss_fn=self.loss_fn,
+            best_val_loss=self.best_val_loss,
         )
 
     def load_checkpoint(self, filename: Optional[Path] = None):
@@ -201,7 +256,7 @@ class Trainer:
                 raise FileNotFoundError("No checkpoints were found.")
 
         # Load the checkpoint and apply all parameters
-        self.epoch, self.loss_fn, self.global_step = Checkpoint.load(
+        self.epoch, self.loss_fn, self.global_step, self.best_val_loss = Checkpoint.load(
             filename,
             device=self.device,
             config=CONFIG,
