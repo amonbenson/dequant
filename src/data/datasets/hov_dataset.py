@@ -131,6 +131,46 @@ class HOVDataset(Dataset):
 
         return tracks
 
+    def shuffle_files(self, seed: Optional[int] = None) -> None:
+        """Shuffle the order of npz files while keeping each file's sequences contiguous.
+
+        This provides a compromise between full random shuffling (bad for the LRU cache)
+        and no shuffling (bad for training if files are ordered by content).
+        Call this once per epoch before iterating the DataLoader.
+        """
+        if self._inline:
+            return
+
+        rng = np.random.default_rng(seed)
+
+        # Group segment indices by file, preserving track order within each file
+        file_to_segs: dict[int, list[int]] = {}
+        for seg_i, file_idx in enumerate(self._seg_file_idx):
+            file_to_segs.setdefault(file_idx, []).append(seg_i)
+
+        # Shuffle file order
+        file_order = list(file_to_segs.keys())
+        rng.shuffle(file_order)
+
+        # Rebuild index in new order
+        new_seq_starts: list[int] = []
+        new_file_idx: list[int] = []
+        new_track_idx: list[int] = []
+        total = 0
+
+        n_segs = len(self._seg_seq_starts)
+        for file_idx in file_order:
+            for seg_i in file_to_segs[file_idx]:
+                n_seqs = self._seg_seq_starts[seg_i + 1] - self._seg_seq_starts[seg_i] if seg_i + 1 < n_segs else self._total_seqs - self._seg_seq_starts[seg_i]
+                new_seq_starts.append(total)
+                new_file_idx.append(self._seg_file_idx[seg_i])
+                new_track_idx.append(self._seg_track_idx[seg_i])
+                total += n_seqs
+
+        self._seg_seq_starts = new_seq_starts
+        self._seg_file_idx = new_file_idx
+        self._seg_track_idx = new_track_idx
+
     def __len__(self) -> int:
         n = self._num_sequences if self._inline else self._total_seqs
         if self.config.max_samples is not None:

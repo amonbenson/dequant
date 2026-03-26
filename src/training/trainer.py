@@ -72,6 +72,11 @@ class Trainer:
         self.writer = SummaryWriter(log_dir=log_dir)
 
     def train_epoch(self):
+        # Shuffle npz file order each epoch for better data diversity without breaking cache locality
+        if CONFIG.train.sample_shuffle:
+            assert isinstance(self.train_set.dataset, HOVEncoderDecoderDataset)
+            self.train_set.dataset.shuffle_files()
+
         # Training
         logger.info("Training ...")
         self.model.train()
@@ -223,7 +228,7 @@ class Trainer:
         dataloader = DataLoader(
             dataset,
             batch_size=CONFIG.train.batch_size,
-            shuffle=CONFIG.train.sample_shuffle,
+            shuffle=False,  # file-level shuffling is handled by dataset.shuffle_files() each epoch
             pin_memory=True if torch.cuda.is_available() else False,
             num_workers=0,
         )

@@ -86,11 +86,11 @@ class TrainConfig:
     lr_scheduler: str = "cosine"  # "none" or "cosine"
     lr_warmup_epochs: int = 3  # linear warmup epochs before scheduler kicks in
     num_epochs: int = 100  # # maximum number of epochs to train for
-    batch_size: int = 512  # number of samples per batch
+    batch_size: int = 128  # number of samples per batch
 
     auto_preprocess: bool = False  # always run preprocess before training
     sample_stride: int = 128  # offset in which sample sequences are taken from the dataset
-    sample_shuffle: bool = False  # whether samples should be ordered randomly
+    sample_shuffle: bool = True  # whether samples should be ordered randomly
 
     max_train_samples: Optional[int] = None  # limit number of training sequences. None = use all
     max_val_samples: Optional[int] = None  # limit number of validation sequences. None = use all
