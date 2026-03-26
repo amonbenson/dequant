@@ -77,12 +77,15 @@ class Predictor:
         self._update_pos_enc()
 
     def _update_pos_enc(self):
-        # Generate positional encoding for the whole sequence
-        step_idx = np.arange(0, len(self._sequence))
-        pos_in_bar = step_idx % self.config.model.drums.steps_per_beat
-        bar_idx = step_idx // self.config.model.drums.steps_per_beat
+        # Generate positional encoding for the whole sequence.
+        # Must match the formula used in hov_converter.py during preprocessing.
+        steps_per_bar = self.config.model.drums.steps_per_beat * 4  # 4/4 time: 4 beats × 4 steps
+        total_bars = max(1, self._max_seq_len // steps_per_bar)
+        step_idx = np.arange(0, len(self._sequence)) % self._max_seq_len
+        pos_in_bar = step_idx % steps_per_bar
+        bar_idx = step_idx // steps_per_bar
 
-        self._pos_enc = torch.from_numpy(self.converter.positional_encoding(bar_idx, pos_in_bar, self._max_seq_len))
+        self._pos_enc = torch.from_numpy(self.converter.positional_encoding(bar_idx, pos_in_bar, total_bars))
 
     def _adjust_capacity(self):
         if self._playhead_position > 16000:
@@ -112,9 +115,12 @@ class Predictor:
             # Store the hits for the new step
             self._sequence[self.context_end, :, 0] = step_hits
 
-            # Cut out the current sequence area from the hits and positional encoding
+            # Cut out the current sequence area from the hits and positional encoding.
+            # Pos enc always starts from index 0 - training used sample_stride == max_seq_len,
+            # so every training window had pos_enc starting at enc(0). We must match that here.
             encoder_input = self._sequence[self.context_start : self.context_end + 1, :, 0]  # Hits only
-            pos_enc_input = self._pos_enc[self.context_start : self.context_end + 1]
+            window_len = self.context_end - self.context_start + 1
+            pos_enc_input = self._pos_enc[0:window_len]
 
             # Run the model to get a full sequence prediction
             prediction = self.model(
