@@ -13,9 +13,9 @@ from magenta.models.music_vae.trained_model import TrainedModel as VaeModel
 
 def run_groovae(input_midis, ckpt_dir, eval_seq_len):
     groovae_model = VaeModel(
-        vae_configs.CONFIG_MAP["groovae_4bar"],
+        vae_configs.CONFIG_MAP["groovae_2bar_humanize"],
         batch_size=1,
-        checkpoint_dir_or_path=str(Path(ckpt_dir) / "model.ckpt-2721"),
+        checkpoint_dir_or_path=str(Path(ckpt_dir) / "model.ckpt-3061"),
     )
 
     def _midi_b64_to_note_seq(midi_b64: np.ndarray):
