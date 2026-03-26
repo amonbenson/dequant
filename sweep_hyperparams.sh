@@ -34,8 +34,8 @@ echo ""
 # Define experiments as an array
 # Format: "experiment_name|d_model|n_heads|n_layers|dropout|learning_rate|batch_size|num_epochs|warmup_epochs|use_egmd|use_lmd"
 declare -a EXPERIMENTS=(
-    "egmd_only_d128_h2_l1|128|2|1|0.0|5e-5|64|30|3|true|false"
-    "lmd_only_d128_h2_l1|128|2|1|0.0|5e-5|64|30|3|false|true"
+    # "egmd_only_d128_h2_l1|128|2|1|0.0|5e-5|64|30|3|true|false"
+    # "lmd_only_d128_h2_l1|128|2|1|0.0|5e-5|64|30|3|false|true"
     "combined_d128_h2_l1|128|2|1|0.0|5e-5|64|30|3|true|true"
 )
 
@@ -98,6 +98,12 @@ for i in "${!EXPERIMENTS[@]}"; do
     EXP_CHECKPOINT_DIR="${CHECKPOINT_BASE_DIR}/sweep_${SWEEP_ID}/${NAME}"
     mkdir -p "$EXP_CHECKPOINT_DIR"
 
+    # tyro uses --flag / --no-flag for booleans, not --flag=true
+    EGMD_FLAG="--config.data.egmd.enabled"
+    [[ "$USE_EGMD" == "false" ]] && EGMD_FLAG="--config.data.egmd.no-enabled"
+    LMD_FLAG="--config.data.lmd.enabled"
+    [[ "$USE_LMD" == "false" ]] && LMD_FLAG="--config.data.lmd.no-enabled"
+
     # Build the training command
     TRAIN_CMD="${PYTHON_CMD} \
         --config.model.transformer.d-model=${D_MODEL} \
@@ -110,8 +116,8 @@ for i in "${!EXPERIMENTS[@]}"; do
         --config.train.lr-warmup-epochs=${WARMUP_EPOCHS} \
         --config.train.run-name=${NAME} \
         --config.train.checkpoint-dir=${EXP_CHECKPOINT_DIR} \
-        --config.data.egmd.enabled=${USE_EGMD} \
-        --config.data.lmd.enabled=${USE_LMD} \
+        ${EGMD_FLAG} \
+        ${LMD_FLAG} \
         --config.train.no-auto-preprocess \
         --config.train.no-resume \
         train"

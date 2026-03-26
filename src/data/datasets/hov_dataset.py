@@ -68,8 +68,8 @@ class HOVDataset(Dataset):
 
         # Per-segment index (one segment = one track with ≥1 usable sequence)
         self._seg_seq_starts: list[int] = []  # cumulative global seq index
-        self._seg_file_idx: list[int] = []    # index into self._npz_files
-        self._seg_track_idx: list[int] = []   # index within that file's object array
+        self._seg_file_idx: list[int] = []  # index into self._npz_files
+        self._seg_track_idx: list[int] = []  # index within that file's object array
 
         # File-level LRU cache: file_idx -> list of (data_t, pos_t) per track
         self._file_cache: OrderedDict[int, list[tuple[torch.Tensor, torch.Tensor] | None]] = OrderedDict()
@@ -162,11 +162,7 @@ class HOVDataset(Dataset):
         n_segs = len(self._seg_seq_starts)
         for file_idx in file_order:
             for seg_i in file_to_segs[file_idx]:
-                n_seqs = (
-                    self._seg_seq_starts[seg_i + 1] - self._seg_seq_starts[seg_i]
-                    if seg_i + 1 < n_segs
-                    else self._total_seqs - self._seg_seq_starts[seg_i]
-                )
+                n_seqs = self._seg_seq_starts[seg_i + 1] - self._seg_seq_starts[seg_i] if seg_i + 1 < n_segs else self._total_seqs - self._seg_seq_starts[seg_i]
                 new_seq_starts.append(total)
                 new_file_idx.append(self._seg_file_idx[seg_i])
                 new_track_idx.append(self._seg_track_idx[seg_i])

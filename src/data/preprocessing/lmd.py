@@ -34,7 +34,7 @@ def _find_drum_files(midi_files: list[Path], n_workers: int | None) -> list[Path
     return sorted(drum_files)
 
 
-def _process_batch(converter: HOVConverter, files: list[Path], out_path: Path, n_workers: int | None) -> int:
+def _process_batch(converter: HOVConverter, files: list[Path], out_path: Path, n_workers: int) -> int:
     """Convert a batch of MIDI files and save to a single .npz file."""
     file_infos: FileInfos = [(path, None) for path in files]
     results = converter.midi_to_hov_batch(file_infos, n_workers=n_workers)
@@ -84,9 +84,10 @@ def preprocess_lmd():
     all_midi_files = sorted(midi_dir.rglob("*.mid")) + sorted(midi_dir.rglob("*.midi"))
     logger.info(f"Found {len(all_midi_files)} MIDI files total, filtering for drum tracks...")
 
-    # Convert 0 -> None so ProcessPoolExecutor picks the number of workers automatically
-    n_workers = CONFIG.data.num_workers if CONFIG.data.num_workers > 0 else None
-    drum_files = _find_drum_files(all_midi_files, n_workers)
+    # _find_drum_files uses ProcessPoolExecutor which wants None for "auto"; midi_to_hov_batch
+    # handles 0 -> cpu_count internally so we pass the raw config value there.
+    n_workers_pool = CONFIG.data.num_workers if CONFIG.data.num_workers > 0 else None
+    drum_files = _find_drum_files(all_midi_files, n_workers_pool)
     logger.info(f"{len(drum_files)} files contain drum tracks")
 
     # Deterministic 80/10/10 split
@@ -118,7 +119,7 @@ def preprocess_lmd():
                 continue
 
             logger.info(f"Batch {batch_idx + 1}/{len(batches)} ({len(batch)} files)...")
-            n_saved = _process_batch(converter, batch, out_path, n_workers)
+            n_saved = _process_batch(converter, batch, out_path, CONFIG.data.num_workers)
             total_tracks += n_saved
             logger.info(f"Saved {n_saved} tracks to '{out_path}'")
 
