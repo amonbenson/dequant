@@ -71,6 +71,11 @@ class Trainer:
         self.writer = SummaryWriter(log_dir=log_dir)
 
     def train_epoch(self):
+        # Shuffle npz file order each epoch for better data diversity without breaking cache locality
+        if CONFIG.train.sample_shuffle:
+            assert isinstance(self.train_set.dataset, HOVEncoderDecoderDataset)
+            self.train_set.dataset.shuffle_files()
+
         # Training
         logger.info("Training ...")
         self.model.train()
@@ -210,6 +215,19 @@ class Trainer:
     def create_dataloader(dir: Path, max_samples: Optional[int] = None):
         logger.info(f"Loading dataset '{dir}' ...")
 
+        # Derive which npz files to load based on which datasets are enabled.
+        # EGMD files are named egmd.npz; LMD files are named lmd_*.npz.
+        use_egmd = CONFIG.data.egmd.enabled
+        use_lmd = CONFIG.data.lmd.enabled
+        if use_egmd and use_lmd:
+            glob_pattern = "*.npz"
+        elif use_egmd:
+            glob_pattern = "egmd*.npz"
+        elif use_lmd:
+            glob_pattern = "lmd*.npz"
+        else:
+            raise ValueError("No datasets enabled. Set data.egmd.enabled or data.lmd.enabled to True.")
+
         dataset = HOVEncoderDecoderDataset(
             HOVDatasetConfig(
                 dir=dir,
@@ -217,12 +235,13 @@ class Trainer:
                 sample_stride=CONFIG.train.sample_stride,
                 filter_empty=False,
                 max_samples=max_samples,
+                glob_pattern=glob_pattern,
             )
         )
         dataloader = DataLoader(
             dataset,
             batch_size=CONFIG.train.batch_size,
-            shuffle=CONFIG.train.sample_shuffle,
+            shuffle=False,  # file-level shuffling is handled by dataset.shuffle_files() each epoch
             pin_memory=True if torch.cuda.is_available() else False,
             num_workers=0,
         )

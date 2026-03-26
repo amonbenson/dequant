@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from src.data.datasets.hov_dataset import HOVDataset, HOVDatasetConfig, HOVEncoderDecoderDataset
-from tests.data.utils import create_dummy_dataset, create_dummy_hov, create_dummy_pos_enc
+from tests.data.utils import create_dummy_hov, create_dummy_pos_enc
 
 
 def test_dumm_hov_generator():
@@ -15,58 +15,58 @@ def test_dumm_hov_generator():
 
 
 def test_dataset_aligned_sample_stride():
-    dataset = create_dummy_dataset(
-        num_steps=32,
-        num_instruments=9,
-        seq_len=16,
-        sample_stride=8,
-        filter_empty=False,
+    data = create_dummy_hov(num_steps=32, num_instruments=9)
+    pos_enc = create_dummy_pos_enc(num_steps=32)
+    dataset = HOVDataset(
+        HOVDatasetConfig(dir=Path("dummy"), seq_len=16, sample_stride=8, filter_empty=False),
+        data=data,
+        pos_enc=pos_enc,
     )
     hov0, pos0 = dataset[0]
     hov1, pos1 = dataset[1]
     hov2, pos2 = dataset[2]
 
     assert len(dataset) == 3
-    assert hov0.numpy().tolist() == dataset.raw_data[0:16].tolist()
-    assert hov1.numpy().tolist() == dataset.raw_data[8:24].tolist()
-    assert hov2.numpy().tolist() == dataset.raw_data[16:32].tolist()
+    assert hov0.numpy().tolist() == data[0:16].tolist()
+    assert hov1.numpy().tolist() == data[8:24].tolist()
+    assert hov2.numpy().tolist() == data[16:32].tolist()
 
     # pos_encoding alignment
-    assert pos0.numpy().tolist() == dataset.pos_enc[0:16].tolist()
-    assert pos1.numpy().tolist() == dataset.pos_enc[8:24].tolist()
-    assert pos2.numpy().tolist() == dataset.pos_enc[16:32].tolist()
+    assert pos0.numpy().tolist() == pos_enc[0:16].tolist()
+    assert pos1.numpy().tolist() == pos_enc[8:24].tolist()
+    assert pos2.numpy().tolist() == pos_enc[16:32].tolist()
 
 
 def test_dataset_misaligned_sample_stride():
-    dataset = create_dummy_dataset(
-        num_steps=31,
-        num_instruments=9,
-        seq_len=16,
-        sample_stride=8,
-        filter_empty=False,
+    data31 = create_dummy_hov(num_steps=31, num_instruments=9)
+    pos_enc31 = create_dummy_pos_enc(num_steps=31)
+    dataset = HOVDataset(
+        HOVDatasetConfig(dir=Path("dummy"), seq_len=16, sample_stride=8, filter_empty=False),
+        data=data31,
+        pos_enc=pos_enc31,
     )
     assert len(dataset) == 2
     hov0, pos0 = dataset[0]
     hov1, pos1 = dataset[1]
 
-    assert hov0.numpy().tolist() == dataset.raw_data[0:16].tolist()
-    assert hov1.numpy().tolist() == dataset.raw_data[8:24].tolist()
+    assert hov0.numpy().tolist() == data31[0:16].tolist()
+    assert hov1.numpy().tolist() == data31[8:24].tolist()
 
-    dataset = create_dummy_dataset(
-        num_steps=33,
-        num_instruments=9,
-        seq_len=16,
-        sample_stride=8,
-        filter_empty=False,
+    data33 = create_dummy_hov(num_steps=33, num_instruments=9)
+    pos_enc33 = create_dummy_pos_enc(num_steps=33)
+    dataset = HOVDataset(
+        HOVDatasetConfig(dir=Path("dummy"), seq_len=16, sample_stride=8, filter_empty=False),
+        data=data33,
+        pos_enc=pos_enc33,
     )
     assert len(dataset) == 3
     hov0, pos0 = dataset[0]
     hov1, pos1 = dataset[1]
     hov2, pos2 = dataset[2]
 
-    assert hov0.numpy().tolist() == dataset.raw_data[0:16].tolist()
-    assert hov1.numpy().tolist() == dataset.raw_data[8:24].tolist()
-    assert hov2.numpy().tolist() == dataset.raw_data[16:32].tolist()
+    assert hov0.numpy().tolist() == data33[0:16].tolist()
+    assert hov1.numpy().tolist() == data33[8:24].tolist()
+    assert hov2.numpy().tolist() == data33[16:32].tolist()
 
 
 @pytest.mark.skip(reason="Filtering is currently not implemented")

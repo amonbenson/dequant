@@ -9,9 +9,19 @@ from .data.converters.hov_converter import DEFAULT_DRUM_CATEGORIES, DrumCategory
 class EGMDSourceConfig:
     """Configuration for the E-GMD dataset source."""
 
-    enabled: bool = True  # use this dataset
+    enabled: bool = True  # use this dataset for preprocessing and training
     midi_url: str = "https://storage.googleapis.com/magentadata/datasets/e-gmd/v1.0.0/e-gmd-v1.0.0-midi.zip"
     metadata_url: str = "https://storage.googleapis.com/magentadata/datasets/e-gmd/v1.0.0/e-gmd-v1.0.0.csv"
+
+
+@dataclass
+class LMDSourceConfig:
+    """Configuration for the Lakh MIDI Dataset source."""
+
+    enabled: bool = False  # use this dataset for preprocessing and training
+    url: str = "http://hog.ee.columbia.edu/craffel/lmd/lmd_full.tar.gz"
+    train_split: float = 0.8  # fraction of files used for training
+    val_split: float = 0.1  # fraction used for validation (remainder goes to test)
 
 
 @dataclass
@@ -26,6 +36,7 @@ class DataConfig:
 
     # Data sources
     egmd: EGMDSourceConfig = field(default_factory=EGMDSourceConfig)  # egmd configuration
+    lmd: LMDSourceConfig = field(default_factory=LMDSourceConfig)  # lmd configuration
 
 
 @dataclass
@@ -76,7 +87,7 @@ class TrainConfig:
     num_epochs: int = 100  # # maximum number of epochs to train for
     batch_size: int = 64  # number of samples per batch
 
-    auto_preprocess: bool = True  # always run preprocess before training
+    auto_preprocess: bool = False  # always run preprocess before training
     sample_stride: int = 80  # offset in which sample sequences are taken from the dataset. Use 128 / golden ratio ~= 80 for most balanced offsets
     sample_shuffle: bool = True  # whether samples should be ordered randomly
 

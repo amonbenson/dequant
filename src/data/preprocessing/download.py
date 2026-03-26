@@ -39,3 +39,15 @@ def unzip_file(zip_filename: Path, target_dir: Path):
 
     with ZipFile(zip_filename) as f:
         f.extractall(target_dir)
+
+
+def untar_file(tar_filename: Path, target_dir: Path):
+    import tarfile
+
+    if target_dir.exists():
+        logger.info(f"Skipping untar, because the target directory '{target_dir}' already exists.")
+        return
+
+    logger.info(f"Extracting '{tar_filename}' ...")
+    with tarfile.open(tar_filename, "r:gz") as tar:
+        tar.extractall(target_dir)
