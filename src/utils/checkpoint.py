@@ -1,4 +1,5 @@
 import logging
+import pathlib
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -45,7 +46,14 @@ class Checkpoint:
         filename: Path, *, device: torch.device | str, config: Optional[RootConfig], model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None
     ) -> tuple[int, nn.Module, int, float]:
         logger.info(f"Loading checkpoint from {filename} ...")
-        checkpoint = torch.load(filename, map_location=device, weights_only=False)
+        # Checkpoints saved on Linux contain PosixPath objects which can't be unpickled on Windows.
+        # Temporarily remap PosixPath to the generic Path so pickle can deserialize them.
+        _orig = pathlib.PosixPath
+        pathlib.PosixPath = Path  # type: ignore[misc]
+        try:
+            checkpoint = torch.load(filename, map_location=device, weights_only=False)
+        finally:
+            pathlib.PosixPath = _orig  # type: ignore[misc]
 
         # Validate the checkpoint config
         if config is not None and checkpoint["config"] != asdict(config):
