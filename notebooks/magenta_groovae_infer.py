@@ -2,7 +2,6 @@ import sys
 import json
 import numpy as np
 import traceback
-import tempfile
 from pathlib import Path
 import base64
 
@@ -11,7 +10,7 @@ from magenta.models.music_vae import configs as vae_configs
 from magenta.models.music_vae.trained_model import TrainedModel as VaeModel
 
 
-def run_groovae(input_midis, ckpt_dir, eval_seq_len):
+def run_groovae(input_midis, ckpt_dir, eval_seq_len, tempo_bpm=120, steps_per_beat=4):
     groovae_model = VaeModel(
         vae_configs.CONFIG_MAP["groovae_2bar_humanize"],
         batch_size=1,
@@ -22,19 +21,29 @@ def run_groovae(input_midis, ckpt_dir, eval_seq_len):
         midi_data = base64.b64decode(midi_b64)
         return note_seq.midi_io.midi_to_note_sequence(midi_data)
 
-    def _note_seq_to_midi_b64(ns):
-        with tempfile.NamedTemporaryFile(suffix=".mid", delete=False) as f:
-            tmp_path = Path(f.name)
-        try:
-            note_seq.midi_io.note_sequence_to_midi_file(ns, str(tmp_path))
-            with open(tmp_path, "rb") as f:
-                midi_b64 = base64.b64encode(f.read()).decode()
-                return midi_b64
-        except Exception as e:
-            print(f"Warning: MIDI conversion failed ({e})", file=sys.stderr)
-            traceback.print_exc()
-        finally:
-            tmp_path.unlink()
+    def _note_seq_to_note_list(ns):
+        """Extract notes directly from NoteSequence, bypassing MIDI round-trip.
+
+        Returns a list of dicts with:
+          - pitch:    MIDI pitch (int)
+          - step:     nearest grid step index (int)
+          - offset:   fractional step offset from grid, i.e. step_float - step (float)
+          - velocity: normalised velocity in [0, 1] (float)
+        """
+        steps_ps = tempo_bpm / 60.0 * steps_per_beat
+        notes = []
+        for note in ns.notes:
+            if note.velocity > 0:
+                step_float = float(note.start_time) * steps_ps
+                step = int(round(step_float))
+                offset = step_float - step
+                notes.append({
+                    "pitch": int(note.pitch),
+                    "step": step,
+                    "offset": float(offset),
+                    "velocity": float(note.velocity) / 127.0,
+                })
+        return notes
 
     results = []
 
@@ -44,13 +53,13 @@ def run_groovae(input_midis, ckpt_dir, eval_seq_len):
         try:
             ns_in = _midi_b64_to_note_seq(input_midi)
             z = groovae_model.encode([ns_in])[0]
-            [ns_out] = groovae_model.decode(z, length=eval_seq_len, temperature=1.0)
-            output_midi = _note_seq_to_midi_b64(ns_out)
+            [ns_out] = groovae_model.decode(z, length=eval_seq_len, temperature=0.0)
+            note_list = _note_seq_to_note_list(ns_out)
         except Exception as e:
             print(f"Skipping sample {i}: {e}", file=sys.stderr)
             traceback.print_exc()
-            output_midi = ""
-        results.append(output_midi)
+            note_list = None
+        results.append(note_list)
 
     return results
 
@@ -62,6 +71,8 @@ if __name__ == "__main__":
         input_midis=data["input_midis"],
         ckpt_dir=data["ckpt_dir"],
         eval_seq_len=data["eval_seq_len"],
+        tempo_bpm=data.get("tempo_bpm", 120),
+        steps_per_beat=data.get("steps_per_beat", 4),
     )
 
     print(json.dumps(preds))
