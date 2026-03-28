@@ -104,7 +104,14 @@ jobs:
         shell: bash
         run: |
           $PYTHON -m pip install --upgrade pip
-          $PYTHON -m pip install -r requirements.txt
+          if [ "${{ matrix.macos-x86 }}" = "true" ]; then
+            # torch >= 2.3 dropped macOS Intel wheels; install last compatible version first,
+            # then install the rest of requirements.txt excluding torch/torchaudio lines.
+            $PYTHON -m pip install "torch==2.2.2" "torchaudio==2.2.2"
+            grep -vE "^torch" requirements.txt | $PYTHON -m pip install -r /dev/stdin
+          else
+            $PYTHON -m pip install -r requirements.txt
+          fi
           $PYTHON -m pip install pyinstaller
 
       # Build
