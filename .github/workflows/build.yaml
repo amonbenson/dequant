@@ -15,25 +15,54 @@ jobs:
           - os: ubuntu-latest
             binary: dequant
             artifact: dequant-linux-x86_64
+
           - os: windows-latest
             binary: dequant.exe
             artifact: dequant-windows-x86_64.exe
-          - os: macos-13
-            binary: dequant
-            artifact: dequant-macos-x86_64
+
           - os: macos-latest
             binary: dequant
             artifact: dequant-macos-arm64
+
+          # Runs on the same ARM runner but installs an x86_64 Python via
+          # Miniconda under Rosetta 2 for Intel Mac cross-compilation.
+          - os: macos-latest
+            binary: dequant
+            artifact: dequant-macos-x86_64
+            macos-x86: true
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v6
 
+      # Standard Python setup (all platforms except macOS x86_64)
       - uses: actions/setup-python@v6
+        if: "!matrix.macos-x86"
         with:
           python-version: "3.11"
 
+      # MacOS x86_64: install an x86_64 Python via Miniconda + Rosetta 2
+      - name: Install Rosetta 2 and x86_64 Python (macOS x86_64)
+        if: matrix.macos-x86
+        run: |
+          softwareupdate --install-rosetta --agree-to-license
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh \
+            -o /tmp/miniconda-x86.sh
+          arch -x86_64 bash /tmp/miniconda-x86.sh -b -p "$HOME/miniconda-x86"
+          arch -x86_64 "$HOME/miniconda-x86/bin/conda" install -y python=3.11
+
+      # Expose the right Python binary as $PYTHON for the steps below
+      - name: Set PYTHON env var
+        shell: bash
+        run: |
+          if [ "${{ matrix.macos-x86 }}" = "true" ]; then
+            echo "PYTHON=$HOME/miniconda-x86/bin/python" >> "$GITHUB_ENV"
+          else
+            echo "PYTHON=python" >> "$GITHUB_ENV"
+          fi
+
+      # System libraries
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -42,19 +71,30 @@ jobs:
 
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install fluid-synth
+        run: |
+          if [ "${{ matrix.macos-x86 }}" = "true" ]; then
+            # x86_64 Homebrew lives at /usr/local on Apple Silicon + Rosetta 2
+            arch -x86_64 /bin/bash -c \
+              "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+            arch -x86_64 /usr/local/bin/brew install fluid-synth
+          else
+            brew install fluid-synth
+          fi
 
       - name: Install system dependencies (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: choco install fluidsynth --yes
 
+      # Python dependencies
       - name: Install Python dependencies
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          $PYTHON -m pip install --upgrade pip
+          $PYTHON -m pip install -r requirements.txt
+          $PYTHON -m pip install pyinstaller
 
+      # Build
       - name: Create entry point
         shell: bash
         run: printf 'from src.__main__ import main\nmain()\n' > _entry.py
@@ -62,7 +102,7 @@ jobs:
       - name: Build binary
         shell: bash
         run: |
-          pyinstaller --onefile \
+          $PYTHON -m PyInstaller --onefile \
             --name dequant \
             --paths . \
             --collect-all torch \
