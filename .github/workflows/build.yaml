@@ -161,16 +161,16 @@ jobs:
       matrix:
         include:
           - artifact: dequant-linux-x86_64
-            zip: Dequant-linux-x86_64.zip
+            zip: Dequant-M4L-linux-x86_64.zip
             executable: true
           - artifact: dequant-windows-x86_64.exe
-            zip: Dequant-windows-x86_64.zip
+            zip: Dequant-M4L-windows-x86_64.zip
             executable: false
           - artifact: dequant-macos-arm64
-            zip: Dequant-macos-arm64.zip
+            zip: Dequant-M4L-macos-arm64.zip
             executable: true
           - artifact: dequant-macos-x86_64
-            zip: Dequant-macos-x86_64.zip
+            zip: Dequant-M4L-macos-x86_64.zip
             executable: true
     steps:
       - uses: actions/checkout@v6
@@ -178,25 +178,25 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.artifact }}
-          path: staging/DequantData/bin
+          path: staging/Dequant-M4L/DequantData/bin
 
       - name: Set binary permissions
         if: matrix.executable
-        run: chmod +x staging/DequantData/bin/${{ matrix.artifact }}
+        run: chmod +x staging/Dequant-M4L/DequantData/bin/${{ matrix.artifact }}
 
       - name: Download checkpoint
         run: |
-          mkdir -p staging/DequantData/checkpoints
+          mkdir -p staging/Dequant-M4L/DequantData/checkpoints
           curl -fsSL https://github.com/amonbenson/dequant-checkpoints/releases/download/checkpoints_v1/dequant_l1.pt \
-            -o staging/DequantData/checkpoints/dequant_l1.pt
+            -o staging/Dequant-M4L/DequantData/checkpoints/dequant_l1.pt
 
       - name: Copy Max4Live files
         run: |
-          cp max4live/Dequant.amxd staging/Dequant.amxd
-          cp max4live/DequantBridge.js staging/DequantBridge.js
+          cp max4live/Dequant.amxd staging/Dequant-M4L/Dequant.amxd
+          cp max4live/DequantBridge.js staging/Dequant-M4L/DequantBridge.js
 
       - name: Create zip
-        run: cd staging && zip -r ../${{ matrix.zip }} .
+        run: cd staging && zip -r ../${{ matrix.zip }} Dequant-M4L
 
       - uses: actions/upload-artifact@v7
         with:
@@ -236,22 +236,22 @@ jobs:
       # Download all platform-specific Max4Live zips
       - uses: actions/download-artifact@v8
         with:
-          name: Dequant-linux-x86_64.zip
+          name: Dequant-M4L-linux-x86_64.zip
           path: staging
 
       - uses: actions/download-artifact@v8
         with:
-          name: Dequant-windows-x86_64.zip
+          name: Dequant-M4L-windows-x86_64.zip
           path: staging
 
       - uses: actions/download-artifact@v8
         with:
-          name: Dequant-macos-arm64.zip
+          name: Dequant-M4L-macos-arm64.zip
           path: staging
 
       - uses: actions/download-artifact@v8
         with:
-          name: Dequant-macos-x86_64.zip
+          name: Dequant-M4L-macos-x86_64.zip
           path: staging
 
       - name: Publish GitHub Release
