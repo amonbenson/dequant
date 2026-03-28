@@ -1,0 +1,86 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - feat/dequantize-rt
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary: dequant
+            artifact: dequant-linux-x86_64
+          - os: windows-latest
+            binary: dequant.exe
+            artifact: dequant-windows-x86_64.exe
+          - os: macos-13
+            binary: dequant
+            artifact: dequant-macos-x86_64
+          - os: macos-latest
+            binary: dequant
+            artifact: dequant-macos-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libfluidsynth-dev
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fluid-synth
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: choco install fluidsynth --yes
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Create entry point
+        shell: bash
+        run: printf 'from src.__main__ import main\nmain()\n' > _entry.py
+
+      - name: Build binary
+        shell: bash
+        run: |
+          pyinstaller --onefile \
+            --name dequant \
+            --paths . \
+            --collect-all torch \
+            --collect-all torchaudio \
+            --collect-all flet \
+            --collect-all tyro \
+            --collect-all pretty_midi \
+            --hidden-import mido \
+            --hidden-import rtmidi \
+            --hidden-import fluidsynth \
+            _entry.py
+
+      - name: Rename artifact
+        shell: bash
+        run: mv dist/${{ matrix.binary }} dist/${{ matrix.artifact }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+          if-no-files-found: error
