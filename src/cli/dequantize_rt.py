@@ -32,7 +32,7 @@ def run_dequantize_rt(checkpoint: Path):
                     case "hit", note:
                         # Record a hit at the specified location
                         current_hits[int(note)] = 1
-                    case ["step"]:
+                    case ["pos"]:
                         # Predict one step
                         predictor.process_step(current_hits)
 
@@ -49,11 +49,14 @@ def run_dequantize_rt(checkpoint: Path):
                             if hov[0]:
                                 print(f"hit {i} {hov[1]} {hov[2]}")
                     case "seek", pos:
-                        # Seek to a specific step position
+                        # Calculate and constraint the specified position
                         pos = int(pos)
                         pos = max(0, min(2**16, pos))
-                        predictor.seek(pos)
-                        print(f"pos {pos}", flush=True)
+
+                        # Seek and output only if the position changed
+                        if predictor.get_position() != pos:
+                            predictor.seek(pos)
+                            print(f"pos {pos}", flush=True)
                     case _:
                         print(f"Unknown command: {line}", flush=True, file=sys.stderr)
             except Exception as e:  # noqa: BLE001
