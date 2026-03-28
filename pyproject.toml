@@ -24,3 +24,4 @@ extend-select = ["I"]  # Include isort checks
 
 [tool.pyright]
 typeCheckingMode = "basic"
+ignore = ["notebooks/magenta_groovae_infer.py"]
