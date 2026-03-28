@@ -62,6 +62,19 @@ jobs:
             echo "PYTHON=python" >> "$GITHUB_ENV"
           fi
 
+      # Free disk space before installing torch, so we don't run out of disk space (Linux only)
+      - name: Free disk space (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/lib/node_modules
+          df -h
+
       # System libraries
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
