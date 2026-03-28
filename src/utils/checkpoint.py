@@ -2,10 +2,9 @@ import logging
 import pathlib
 from dataclasses import asdict
 from pathlib import Path
-from typing import Optional
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..config import RootConfig
 
@@ -43,17 +42,25 @@ class Checkpoint:
 
     @staticmethod
     def load(
-        filename: Path, *, device: torch.device | str, config: Optional[RootConfig], model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None
+        filename: Path, *, device: torch.device | str, config: RootConfig | None, model: nn.Module, optimizer: torch.optim.Optimizer | None = None
     ) -> tuple[int, nn.Module, int, float]:
         logger.info(f"Loading checkpoint from {filename} ...")
-        # Checkpoints saved on Linux contain PosixPath objects which can't be unpickled on Windows.
-        # Temporarily remap PosixPath to the generic Path so pickle can deserialize them.
-        _orig = pathlib.PosixPath
+        # Checkpoints may contain PosixPath or WindowsPath objects pickled on a different OS/Python
+        # version. Remap both to the generic Path so pickle can deserialize them cross-platform.
+        # Python 3.12 also removed pathlib.Path._flavour; patch it in if missing so older
+        # checkpoints that reference it during unpickling don't raise AttributeError.
+        _orig_posix = pathlib.PosixPath
+        _orig_windows = pathlib.WindowsPath
         pathlib.PosixPath = Path  # type: ignore[misc]
+        pathlib.WindowsPath = Path  # type: ignore[misc]
+        if not hasattr(pathlib.PurePosixPath, "_flavour"):
+            pathlib.PurePosixPath._flavour = object()  # type: ignore[attr-defined]
+            pathlib.PureWindowsPath._flavour = object()  # type: ignore[attr-defined]
         try:
             checkpoint = torch.load(filename, map_location=device, weights_only=False)
         finally:
-            pathlib.PosixPath = _orig  # type: ignore[misc]
+            pathlib.PosixPath = _orig_posix  # type: ignore[misc]
+            pathlib.WindowsPath = _orig_windows  # type: ignore[misc]
 
         # Validate the checkpoint config
         if config is not None and checkpoint["config"] != asdict(config):
