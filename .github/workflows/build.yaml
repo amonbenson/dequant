@@ -141,7 +141,7 @@ jobs:
         shell: bash
         run: mv dist/${{ matrix.binary }} dist/${{ matrix.artifact }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}
@@ -155,22 +155,22 @@ jobs:
       - uses: actions/checkout@v6
 
       # Download all four platform binaries into a staging area
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-linux-x86_64
           path: staging/DequantData/bin
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-windows-x86_64.exe
           path: staging/DequantData/bin
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-macos-arm64
           path: staging/DequantData/bin
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-macos-x86_64
           path: staging/DequantData/bin
@@ -198,7 +198,7 @@ jobs:
           cd staging
           zip -r ../Dequant.zip .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Dequant
           path: Dequant.zip
@@ -213,28 +213,28 @@ jobs:
       contents: write
     steps:
       # Download all individual binaries
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-linux-x86_64
           path: staging
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-windows-x86_64.exe
           path: staging
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-macos-arm64
           path: staging
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dequant-macos-x86_64
           path: staging
 
       # Download the packaged Max4Live zip
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: Dequant
           path: staging
