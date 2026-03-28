@@ -153,60 +153,55 @@ jobs:
           if-no-files-found: error
 
   package-m4l:
-    name: Package Max4Live Device
+    name: Package Max4Live Device (${{ matrix.artifact }})
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - artifact: dequant-linux-x86_64
+            zip: Dequant-linux-x86_64.zip
+            executable: true
+          - artifact: dequant-windows-x86_64.exe
+            zip: Dequant-windows-x86_64.zip
+            executable: false
+          - artifact: dequant-macos-arm64
+            zip: Dequant-macos-arm64.zip
+            executable: true
+          - artifact: dequant-macos-x86_64
+            zip: Dequant-macos-x86_64.zip
+            executable: true
     steps:
       - uses: actions/checkout@v6
 
-      # Download all four platform binaries into a staging area
       - uses: actions/download-artifact@v8
         with:
-          name: dequant-linux-x86_64
+          name: ${{ matrix.artifact }}
           path: staging/DequantData/bin
 
-      - uses: actions/download-artifact@v8
-        with:
-          name: dequant-windows-x86_64.exe
-          path: staging/DequantData/bin
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: dequant-macos-arm64
-          path: staging/DequantData/bin
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: dequant-macos-x86_64
-          path: staging/DequantData/bin
-
-      # Mark the non-Windows binaries as executable
       - name: Set binary permissions
-        run: chmod +x staging/DequantData/bin/dequant-linux-x86_64 staging/DequantData/bin/dequant-macos-*
+        if: matrix.executable
+        run: chmod +x staging/DequantData/bin/${{ matrix.artifact }}
 
-      # Download the L1 checkpoint
       - name: Download checkpoint
         run: |
           mkdir -p staging/DequantData/checkpoints
           curl -fsSL https://github.com/amonbenson/dequant-checkpoints/releases/download/checkpoints_v1/dequant_l1.pt \
             -o staging/DequantData/checkpoints/dequant_l1.pt
 
-      # Copy the Max4Live files into the staging root
       - name: Copy Max4Live files
         run: |
           cp max4live/Dequant.amxd staging/Dequant.amxd
           cp max4live/DequantBridge.js staging/DequantBridge.js
 
-      # Zip everything preserving the directory structure
-      - name: Create release zip
-        run: |
-          cd staging
-          zip -r ../Dequant.zip .
+      - name: Create zip
+        run: cd staging && zip -r ../${{ matrix.zip }} .
 
       - uses: actions/upload-artifact@v7
         with:
-          name: Dequant
-          path: Dequant.zip
+          name: ${{ matrix.zip }}
+          path: ${{ matrix.zip }}
           if-no-files-found: error
 
   release:
@@ -238,10 +233,25 @@ jobs:
           name: dequant-macos-x86_64
           path: staging
 
-      # Download the packaged Max4Live zip
+      # Download all platform-specific Max4Live zips
       - uses: actions/download-artifact@v8
         with:
-          name: Dequant
+          name: Dequant-linux-x86_64.zip
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dequant-windows-x86_64.zip
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dequant-macos-arm64.zip
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dequant-macos-x86_64.zip
           path: staging
 
       - name: Publish GitHub Release
