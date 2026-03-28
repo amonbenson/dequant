@@ -111,6 +111,11 @@ jobs:
             # then install the rest of requirements.txt excluding torch/torchaudio lines.
             $PYTHON -m pip install "torch==2.2.2" "torchaudio==2.2.2"
             grep -vE "^torch" requirements.txt | $PYTHON -m pip install -r /dev/stdin
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            # The default Linux torch wheel bundles CUDA (~3 GB), bloating the binary.
+            # Install the CPU-only wheel instead (same version, different index).
+            grep -E "^torch" requirements.txt | $PYTHON -m pip install -r /dev/stdin --index-url https://download.pytorch.org/whl/cpu
+            grep -vE "^torch" requirements.txt | $PYTHON -m pip install -r /dev/stdin
           else
             $PYTHON -m pip install -r requirements.txt
           fi
