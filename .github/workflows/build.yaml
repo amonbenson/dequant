@@ -183,7 +183,7 @@ jobs:
       - name: Download checkpoint
         run: |
           mkdir -p staging/DequantData/checkpoints
-          curl -fsSL https://github.com/amonbenson/dequant/releases/download/checkpoints_v1/dequant_l1.pt \
+          curl -fsSL https://github.com/amonbenson/dequant-checkpoints/releases/download/checkpoints_v1/dequant_l1.pt \
             -o staging/DequantData/checkpoints/dequant_l1.pt
 
       # Copy the Max4Live files into the staging root
