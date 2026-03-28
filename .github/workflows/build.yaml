@@ -40,13 +40,13 @@ jobs:
 
       # Standard Python setup (all platforms except macOS x86_64)
       - uses: actions/setup-python@v6
-        if: "!matrix.macos-x86"
+        if: "!matrix['macos-x86']"
         with:
           python-version: "3.11"
 
       # MacOS x86_64: install an x86_64 Python via Miniconda + Rosetta 2
       - name: Install Rosetta 2 and x86_64 Python (macOS x86_64)
-        if: matrix.macos-x86
+        if: matrix['macos-x86']
         run: |
           softwareupdate --install-rosetta --agree-to-license
           curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh \
@@ -58,7 +58,7 @@ jobs:
       - name: Set PYTHON env var
         shell: bash
         run: |
-          if [ "${{ matrix.macos-x86 }}" = "true" ]; then
+          if [ "${{ matrix['macos-x86'] }}" = "true" ]; then
             echo "PYTHON=$HOME/miniconda-x86/bin/python" >> "$GITHUB_ENV"
           else
             echo "PYTHON=python" >> "$GITHUB_ENV"
@@ -87,7 +87,7 @@ jobs:
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          if [ "${{ matrix.macos-x86 }}" = "true" ]; then
+          if [ "${{ matrix['macos-x86'] }}" = "true" ]; then
             # x86_64 Homebrew lives at /usr/local on Apple Silicon + Rosetta 2
             arch -x86_64 /bin/bash -c \
               "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
@@ -106,7 +106,7 @@ jobs:
         shell: bash
         run: |
           $PYTHON -m pip install --upgrade pip
-          if [ "${{ matrix.macos-x86 }}" = "true" ]; then
+          if [ "${{ matrix['macos-x86'] }}" = "true" ]; then
             # torch >= 2.3 dropped macOS Intel wheels; install last compatible version first,
             # then install the rest of requirements.txt excluding torch/torchaudio lines.
             $PYTHON -m pip install "torch==2.2.2" "torchaudio==2.2.2"
@@ -147,7 +147,8 @@ jobs:
           path: dist/${{ matrix.artifact }}
           if-no-files-found: error
 
-  package:
+  package-m4l:
+    name: Package Max4Live Device
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -195,16 +196,17 @@ jobs:
       - name: Create release zip
         run: |
           cd staging
-          zip -r ../DequantMax4Live.zip .
+          zip -r ../Dequant.zip .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DequantMax4Live
-          path: DequantMax4Live.zip
+          name: Dequant
+          path: Dequant.zip
           if-no-files-found: error
 
   release:
-    needs: package
+    name: Release
+    needs: package-m4l
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -234,7 +236,7 @@ jobs:
       # Download the packaged Max4Live zip
       - uses: actions/download-artifact@v4
         with:
-          name: DequantMax4Live
+          name: Dequant
           path: staging
 
       - name: Publish GitHub Release
