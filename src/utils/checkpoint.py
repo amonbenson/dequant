@@ -1,5 +1,6 @@
 import logging
-import pathlib
+import pickle
+import types
 from dataclasses import asdict
 from pathlib import Path
 
@@ -9,6 +10,28 @@ from torch import nn
 from ..config import RootConfig
 
 logger = logging.getLogger("checkpoint")
+
+
+def _path_as_str(*args) -> str:
+    """Deserialise a pickled Path as a plain string, accepting both the parts-tuple
+    and single-string pickle formats used by different Python versions."""
+    return str(Path(*args))
+
+
+class _PathCompatUnpickler(pickle.Unpickler):
+    """Unpickler that deserialises any pathlib.* type as a plain string,
+    ensuring cross-platform and cross-version compatibility."""
+
+    def find_class(self, module, name):
+        if module == "pathlib":
+            return _path_as_str
+        return super().find_class(module, name)
+
+
+# Pickle-module shim for torch.load that substitutes the custom Unpickler above.
+_compat_pickle = types.ModuleType(pickle.__name__)
+_compat_pickle.__dict__.update(vars(pickle))
+_compat_pickle.Unpickler = _PathCompatUnpickler  # type: ignore[attr-defined]
 
 
 class Checkpoint:
@@ -45,32 +68,18 @@ class Checkpoint:
         filename: Path, *, device: torch.device | str, config: RootConfig | None, model: nn.Module, optimizer: torch.optim.Optimizer | None = None
     ) -> tuple[int, nn.Module, int, float]:
         logger.info(f"Loading checkpoint from {filename} ...")
-        # Checkpoints may contain PosixPath or WindowsPath objects pickled on a different OS/Python
-        # version. Remap both to the generic Path so pickle can deserialize them cross-platform.
-        # Python 3.12 also removed pathlib.Path._flavour; patch it in if missing so older
-        # checkpoints that reference it during unpickling don't raise AttributeError.
-        _orig_posix = pathlib.PosixPath
-        _orig_windows = pathlib.WindowsPath
-        pathlib.PosixPath = Path  # type: ignore[misc]
-        pathlib.WindowsPath = Path  # type: ignore[misc]
-        if not hasattr(pathlib.PurePosixPath, "_flavour"):
-            pathlib.PurePosixPath._flavour = object()  # type: ignore[attr-defined]
-            pathlib.PureWindowsPath._flavour = object()  # type: ignore[attr-defined]
-        try:
-            checkpoint = torch.load(filename, map_location=device, weights_only=False)
-        finally:
-            pathlib.PosixPath = _orig_posix  # type: ignore[misc]
-            pathlib.WindowsPath = _orig_windows  # type: ignore[misc]
+        checkpoint = torch.load(filename, map_location=device, weights_only=False, pickle_module=_compat_pickle)
 
-        # Validate the checkpoint config
-        if config is not None and checkpoint["config"] != asdict(config):
+        # Compare only the model sub-config: it defines the architecture and is the only
+        # part relevant to checkpoint compatibility.  data/train config fields are
+        # run-specific (paths, hyper-params) and intentionally ignored here.
+        if config is not None and checkpoint["config"].get("model") != asdict(config.model):
             logger.warning("Loading checkpoint from a different configuration!")
 
         # Load all weights and data
         model.load_state_dict(checkpoint["model"])
         if optimizer is not None:
             optimizer.load_state_dict(checkpoint["optimizer"])
-        # self.scheduler.load_state_dict(checkpoint["scheduler"])
 
         # Load global_step (if it was stored)
         global_step = checkpoint.get("global_step", 0)
