@@ -8,7 +8,7 @@
 
 To infer the model in realtime, we developed a Max4Live plugin: [GitHub Releases](https://github.com/amonbenson/dequant/releases). The plugin folder includes the prebuilt binary for your specific platform as well as the checkpoint for the 1-layer model. To use it, drag the .amxd file onto a MIDI track within Ableton Live. After a few seconds, it should load the model and you will be able to route MIDI messages through it.
 
-On Mac OS, the app will be blocked by default, because it is unsigned. To allow the app, navigate to System Settings > Privacy & Security and scroll down to the bottom. You will see an option to allow the Dequant-App. After that, you will need to remove the Max4Live device from your Live Set and add it again. This time, you should see an option "Open Anyway".
+On macOS, the app will be blocked by default, because it is unsigned. To allow the app, navigate to System Settings > Privacy & Security and scroll down to the bottom. You will see an option to allow the Dequant-App. After that, you will need to remove the Max4Live device from your Live Set and add it again. This time, you should see an option "Open Anyway".
 
 ### Model Checkpoints
 
@@ -108,7 +108,7 @@ The realtime app was used during development and is now largely replaced by the 
 python -m src app
 ```
 
-The connects to a DAW via MIDI and receives realtime messages to dequantize them on the fly. When the app opens, click the "Load Checkpoint" button to load a previously saved checkpoint. Then select the MIDI input and output ports that are routed from and to your DAW. On Mac OS, you will need to setup a virtual MIDI port using the "Audio MIDI Setup" application. On Windows, you can use a tool like loopMIDI to create virtual MIDI ports. After the inputs are selected, the app will receive MIDI messages from the input port, dequantize them using the loaded model, and send the dequantized messages to the output port. It is important that you configure your DAW to send synchronization messages (e.g. MIDI clock), otherwise the dequantization will not work properly.
+The connects to a DAW via MIDI and receives realtime messages to dequantize them on the fly. When the app opens, click the "Load Checkpoint" button to load a previously saved checkpoint. Then select the MIDI input and output ports that are routed from and to your DAW. On macOS, you will need to setup a virtual MIDI port using the "Audio MIDI Setup" application. On Windows, you can use a tool like loopMIDI to create virtual MIDI ports. After the inputs are selected, the app will receive MIDI messages from the input port, dequantize them using the loaded model, and send the dequantized messages to the output port. It is important that you configure your DAW to send synchronization messages (e.g. MIDI clock), otherwise the dequantization will not work properly.
 
 ## Code Linting and Formatting
 
