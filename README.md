@@ -47,7 +47,7 @@ python -m src train
 Checkpoints will be saved every epoch. To resume from a specific checkpoint, type:
 
 ```shell
-python -m src --config.train.resume --config.train.resume-from "./data/checkpoints/<name-of-checkpoint>.pt" train
+python -m src --config.train.resume --config.train.resume-from ".data/checkpoints/<name-of-checkpoint>.pt" train
 ```
 
 ### Configuration
@@ -64,10 +64,10 @@ To evaluate the model performance, it might make sense to manually quantize a dr
 
 ```bash
 # Copy a sample form our dataset to the .data directory
-cp .data/tmp/egmd-midi/e-gmd-v1.0.0/drummer1/eval_session/1_funk-groove1_138_beat_4-4_1.midi original.midi
+cp ".data/tmp/egmd-midi/e-gmd-v1.0.0/drummer1/eval_session/1_funk-groove1_138_beat_4-4_1.midi" "original.midi"
 
 # Use the HOV algorithm to quantize the midi file
-python -m src quantize .original.midi quantized.midi
+python -m src quantize "original.midi" "quantized.midi"
 ```
 
 ### Dequantization (Inference)
@@ -75,13 +75,13 @@ python -m src quantize .original.midi quantized.midi
 A quantized MIDI file (obtained either from the command above or from another application) can be dequantized using the following command:
 
 ```bash
-python -m src dequantize quantized.midi dequantized.midi dequant_l5.pt
+python -m src dequantize "quantized.midi" "dequantized.midi" "dequant_l5.pt"
 ```
 
 This will load a previously saved checkpoint and use our model to add back velocity and offset information to the quantized midi data. When you use one of the fewer-layer models, you will also need to specify the number of layers:
 
 ```bash
-python -m src --config.model.transformer.n_layers=1 dequantize quantized.midi dequantized.midi dequant_l1.pt
+python -m src --config.model.transformer.n_layers=1 dequantize "quantized.midi" "dequantized.midi" "dequant_l1.pt"
 ```
 
 ### Tensorboard
@@ -89,7 +89,7 @@ python -m src --config.model.transformer.n_layers=1 dequantize quantized.midi de
 While training, logs will be written to the `/runs/` directory. You can use tensorboard in a separate terminal to monitor the training progress:
 
 ```bash
-tensorboard --logdir runs
+tensorboard --logdir "runs"
 ```
 
 ### Using the Realtime App (Deprecated)
