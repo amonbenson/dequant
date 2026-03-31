@@ -92,6 +92,14 @@ While training, logs will be written to the `/runs/` directory. You can use tens
 tensorboard --logdir "runs"
 ```
 
+### Running Batch Experiments
+
+To run multiple experiments one after another and to tune hyperparameters, you can use the `sweep_hyperparams.sh` shell script. The configuration is defined directly within the script file. You can then invoke it by running:
+
+```bash
+./sweep_hyperparams.sh
+```
+
 ### Using the Realtime App (Deprecated)
 
 The realtime app was used during development and is now largely replaced by the Max4Live plugin, which provides better performance and lower latency and jitter. If you want to use it nonetheless, type the following command:
