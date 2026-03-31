@@ -222,3 +222,6 @@ __marimo__/
 /.data/
 /runs/
 .DS_Store
+
+# Max4Live resources
+/max4live/DequantData/

@@ -1,0 +1,262 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - feat/dequantize-rt
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary: dequant
+            artifact: dequant-linux-x86_64
+
+          - os: windows-latest
+            binary: dequant.exe
+            artifact: dequant-windows-x86_64.exe
+
+          - os: macos-latest
+            binary: dequant
+            artifact: dequant-macos-arm64
+
+          # Runs on the same ARM runner but installs an x86_64 Python via
+          # Miniconda under Rosetta 2 for Intel Mac cross-compilation.
+          - os: macos-latest
+            binary: dequant
+            artifact: dequant-macos-x86_64
+            macos-x86: true
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Standard Python setup (all platforms except macOS x86_64)
+      - uses: actions/setup-python@v6
+        if: "!matrix['macos-x86']"
+        with:
+          python-version: "3.11"
+
+      # MacOS x86_64: install an x86_64 Python via Miniconda + Rosetta 2
+      - name: Install Rosetta 2 and x86_64 Python (macOS x86_64)
+        if: matrix['macos-x86']
+        run: |
+          softwareupdate --install-rosetta --agree-to-license
+          curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh \
+            -o /tmp/miniconda-x86.sh
+          arch -x86_64 bash /tmp/miniconda-x86.sh -b -p "$HOME/miniconda-x86"
+          arch -x86_64 "$HOME/miniconda-x86/bin/conda" install -y python=3.11
+
+      # Expose the right Python binary as $PYTHON for the steps below
+      - name: Set PYTHON env var
+        shell: bash
+        run: |
+          if [ "${{ matrix['macos-x86'] }}" = "true" ]; then
+            echo "PYTHON=$HOME/miniconda-x86/bin/python" >> "$GITHUB_ENV"
+          else
+            echo "PYTHON=python" >> "$GITHUB_ENV"
+          fi
+
+      # Free disk space before installing torch, so we don't run out of disk space (Linux only)
+      - name: Free disk space (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/lib/node_modules
+          df -h
+
+      # System libraries
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libfluidsynth-dev
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [ "${{ matrix['macos-x86'] }}" = "true" ]; then
+            # x86_64 Homebrew lives at /usr/local on Apple Silicon + Rosetta 2
+            arch -x86_64 /bin/bash -c \
+              "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+            arch -x86_64 /usr/local/bin/brew install fluid-synth
+          else
+            brew install fluid-synth
+          fi
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: choco install fluidsynth --yes
+
+      # Python dependencies
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          $PYTHON -m pip install --upgrade pip
+          if [ "${{ matrix['macos-x86'] }}" = "true" ]; then
+            # torch >= 2.3 dropped macOS Intel wheels; install last compatible version first,
+            # then install the rest of requirements.txt excluding torch/torchaudio lines.
+            $PYTHON -m pip install "torch==2.2.2" "torchaudio==2.2.2"
+            grep -vE "^torch" requirements.txt | $PYTHON -m pip install -r /dev/stdin
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            # The default Linux torch wheel bundles CUDA (~3 GB), bloating the binary.
+            # Install the CPU-only wheel instead (same version, different index).
+            grep -E "^torch" requirements.txt | $PYTHON -m pip install -r /dev/stdin --index-url https://download.pytorch.org/whl/cpu
+            grep -vE "^torch" requirements.txt | $PYTHON -m pip install -r /dev/stdin
+          else
+            $PYTHON -m pip install -r requirements.txt
+          fi
+          $PYTHON -m pip install pyinstaller
+
+      # Build
+      - name: Create entry point
+        shell: bash
+        run: printf 'from src.__main__ import main\nmain()\n' > _entry.py
+
+      - name: Build binary
+        shell: bash
+        run: |
+          $PYTHON -m PyInstaller --onefile \
+            --name dequant \
+            --paths . \
+            --collect-all torch \
+            --collect-all torchaudio \
+            --collect-all flet \
+            --collect-all tyro \
+            --collect-all pretty_midi \
+            --hidden-import mido \
+            --hidden-import rtmidi \
+            --hidden-import fluidsynth \
+            _entry.py
+
+      - name: Rename artifact
+        shell: bash
+        run: mv dist/${{ matrix.binary }} dist/${{ matrix.artifact }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  package-m4l:
+    name: Package Max4Live Device (${{ matrix.artifact }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - artifact: dequant-linux-x86_64
+            zip: Dequant-M4L-linux-x86_64.zip
+            executable: true
+          - artifact: dequant-windows-x86_64.exe
+            zip: Dequant-M4L-windows-x86_64.zip
+            executable: false
+          - artifact: dequant-macos-arm64
+            zip: Dequant-M4L-macos-arm64.zip
+            executable: true
+          - artifact: dequant-macos-x86_64
+            zip: Dequant-M4L-macos-x86_64.zip
+            executable: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.artifact }}
+          path: staging/Dequant-M4L/DequantData/bin
+
+      - name: Set binary permissions
+        if: matrix.executable
+        run: chmod +x staging/Dequant-M4L/DequantData/bin/${{ matrix.artifact }}
+
+      - name: Download checkpoint
+        run: |
+          mkdir -p staging/Dequant-M4L/DequantData/checkpoints
+          curl -fsSL https://github.com/amonbenson/dequant-checkpoints/releases/download/checkpoints_v1/dequant_l1.pt \
+            -o staging/Dequant-M4L/DequantData/checkpoints/dequant_l1.pt
+
+      - name: Copy Max4Live files
+        run: |
+          cp max4live/Dequant.amxd staging/Dequant-M4L/Dequant.amxd
+          cp max4live/DequantBridge.js staging/Dequant-M4L/DequantBridge.js
+
+      - name: Create zip
+        run: cd staging && zip -r ../${{ matrix.zip }} Dequant-M4L
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.zip }}
+          path: ${{ matrix.zip }}
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: package-m4l
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Download all individual binaries
+      - uses: actions/download-artifact@v8
+        with:
+          name: dequant-linux-x86_64
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dequant-windows-x86_64.exe
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dequant-macos-arm64
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dequant-macos-x86_64
+          path: staging
+
+      # Download all platform-specific Max4Live zips
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dequant-M4L-linux-x86_64.zip
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dequant-M4L-windows-x86_64.zip
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dequant-M4L-macos-arm64.zip
+          path: staging
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dequant-M4L-macos-x86_64.zip
+          path: staging
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: staging/*
+          draft: false
+          prerelease: false
