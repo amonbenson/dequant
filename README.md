@@ -1,6 +1,9 @@
 # Drum Dequantization
 
 [![CI](https://github.com/amonbenson/dequant/actions/workflows/ci.yaml/badge.svg)](https://github.com/amonbenson/dequant/actions/workflows/ci.yaml)
+[![Build](https://github.com/amonbenson/dequant/actions/workflows/build.yaml/badge.svg)](https://github.com/amonbenson/dequant/actions/workflows/build.yaml)
+
+We present a conditional Transformer-based encoder–decoder model for expressive drum dequantization. Given a quantized MIDI drum pattern, our model predicts microtiming offsets and velocities to reproduce the expressive characteristics of human performances. The encoder captures rhythmic structure through self-attention, while the decoder generates timing and velocity predictions via cross-attention. A hierarchical positional encoding tailored to musical bar and beat structure is introduced, and domain-informed output constraints ensure musically plausible predictions. Evaluated on the Expanded Groove MIDI Dataset using the GrooVAE protocol, the 5-layer model achieves a timing KL divergence of 0.09 and velocity KL of 0.02, substantially outperforming GrooVAE (0.46 and 0.45, respectively) in distributional alignment with human performances. A Max4Live plugin demonstrates real-time deployability on consumer hardware.
 
 ## Quick Start
 

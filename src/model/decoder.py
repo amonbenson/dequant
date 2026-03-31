@@ -50,6 +50,12 @@ class Decoder(nn.Module):
         self.resid_dropout3 = nn.Dropout(config.dropout)
 
     def forward(self, x: torch.Tensor, encoder_output: torch.Tensor) -> torch.Tensor:
+        """Apply one decoder block (causal self-attention + cross-attention + FFN).
+
+        Args:
+            x: Decoder sequence of shape (B, T, C).
+            encoder_output: Encoder output of shape (B, T_enc, C).
+        """
         B, T, C = x.shape
         T_enc = encoder_output.shape[1]
         n_heads = self.config.n_heads

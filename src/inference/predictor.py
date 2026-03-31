@@ -98,6 +98,14 @@ class Predictor:
             self._update_pos_enc()
 
     def process_step(self, step_hits: torch.Tensor):
+        """Process one grid step of hit activations and advance the playhead.
+
+        Args:
+            step_hits: Binary tensor of shape (num_instruments,) indicating which instruments fired.
+
+        The predicted offset and velocity values are stored in the internal sequence buffer
+        and can be retrieved via get_generated_sequence().
+        """
         with torch.no_grad():
             # Adjust the capacity (if necessary)
             self._adjust_capacity()
@@ -139,7 +147,15 @@ class Predictor:
             # Update the position
             self._playhead_position += 1
 
-    def process_sequence(self, hits: torch.Tensor):
+    def process_sequence(self, hits: torch.Tensor) -> torch.Tensor:
+        """Process a full sequence of hit activations and return the generated HOV sequence.
+
+        Args:
+            hits: Tensor of shape (seq_len, num_instruments) with binary hit activations.
+
+        Returns:
+            Generated sequence tensor of shape (seq_len, num_instruments, 3).
+        """
         logger.info(f"Predicting {len(hits)} steps ...")
 
         # Reset the current time

@@ -77,7 +77,6 @@ class SequenceCanvas(cv.Canvas):
     def _build_sequence_shapes(
         self,
         sequence: np.ndarray,
-        position: int,
         w: float,
         h: float,
     ) -> list[cv.Rect]:
@@ -124,17 +123,6 @@ class SequenceCanvas(cv.Canvas):
                 )
             )
 
-        # Playhead position
-        # shapes.append(
-        #     cv.Rect(
-        #         x=position * step_width,
-        #         y=0,
-        #         width=1,
-        #         height=h,
-        #         paint=ft.Paint(color=ft.Colors.ON_SURFACE),
-        #     )
-        # )
-
         return shapes
 
     def render(self):
@@ -148,9 +136,8 @@ class SequenceCanvas(cv.Canvas):
 
         with self._predictor_lock:
             sequence = self._predictor.get_context_sequence().numpy(force=True)
-            position = self._predictor.get_position()
 
-        sequence_shapes = self._build_sequence_shapes(sequence, position, w, h)
+        sequence_shapes = self._build_sequence_shapes(sequence, w, h)
 
         self.shapes = [background, *sequence_shapes]
         self.update()

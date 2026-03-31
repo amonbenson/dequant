@@ -71,6 +71,7 @@ class Trainer:
         self.writer = SummaryWriter(log_dir=log_dir)
 
     def train_epoch(self):
+        """Run one full training epoch followed by validation, checkpointing, and early-stopping bookkeeping."""
         # Training
         logger.info("Training ...")
         self.model.train()
@@ -161,6 +162,7 @@ class Trainer:
         self.epoch += 1
 
     def train(self):
+        """Run the full training loop, resuming from a checkpoint if configured."""
         # Resume from a previous checkpoint
         if CONFIG.train.resume:
             try:
@@ -208,6 +210,7 @@ class Trainer:
 
     @staticmethod
     def create_dataloader(dir: Path, max_samples: Optional[int] = None):
+        """Build an HOVEncoderDecoderDataset and wrap it in a DataLoader."""
         logger.info(f"Loading dataset '{dir}' ...")
 
         dataset = HOVEncoderDecoderDataset(
