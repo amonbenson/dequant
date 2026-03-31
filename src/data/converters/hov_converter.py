@@ -1,7 +1,3 @@
-"""Preprocessing module for MIDI drum files
-Optimized with parallel processing and vectorized operations
-"""
-
 from __future__ import annotations
 
 import logging
@@ -32,7 +28,6 @@ class HOVConverterConfig:
     _category_lookup: np.ndarray = field(init=False)
     _category_reverse_lookup: np.ndarray = field(init=False)
 
-    # bar_period: int = 8
     def __post_init__(self):
         self._category_lookup = DrumCategory.generate_forward_lookup(self.categories)
         self._category_reverse_lookup = DrumCategory.generate_reverse_lookup(self.categories)
@@ -53,6 +48,7 @@ class HOVConverter:
                 raise ValueError(f"Failed to parse MIDI file {midi}: {e}")
 
     def extract_tempo(self, midi: Path | PrettyMIDI) -> float:
+        """Return the first tempo value (BPM) found in the MIDI file, or 120.0 if none."""
         midi = self._as_pretty_midi(midi)
         _, tempi = midi.get_tempo_changes()
 
@@ -65,7 +61,11 @@ class HOVConverter:
 
         return float(tempi[0])
 
-    def positional_encoding(self, bar_idx: np.ndarray, pos_in_bar: np.ndarray, total_bars: int):
+    def positional_encoding(self, bar_idx: np.ndarray, pos_in_bar: np.ndarray, total_bars: int) -> np.ndarray:
+        """Compute sinusoidal positional encoding for beat and bar positions.
+
+        Returns an array of shape (T, 4): [beat_sin, beat_cos, bar_sin, bar_cos].
+        """
         bar_phase = 2 * np.pi * bar_idx / total_bars  # one full cycle over the fixed model horizon (max bars)
         beat_phase = 2 * np.pi * pos_in_bar / (self.config.steps_per_beat * 4)
 
@@ -77,6 +77,11 @@ class HOVConverter:
         return np.stack([beat_sin, beat_cos, bar_sin, bar_cos], axis=-1)  # shape: (T, 4)
 
     def midi_to_hov(self, midi: Path | PrettyMIDI, tempo_bpm: Optional[int] = None):
+        """Convert a MIDI file to an HOV matrix and positional encoding.
+
+        Returns a tuple of (hov, pos_enc) where hov has shape (T, num_instruments, 3)
+        with channels [hit, offset, velocity], and pos_enc has shape (T, 4).
+        """
         midi_data = self._as_pretty_midi(midi)
 
         # If no tempo was provided, we can still try to extract it from the midi file
@@ -207,12 +212,6 @@ class HOVConverter:
 
         start = time.perf_counter()
 
-        # Convert DataFrame to list of tuples (picklable format)
-        # file_infos = [
-        #     (str(Path(ds_root) / row.midi_filename), row.bpm)
-        #     for row in df.itertuples(index=False)
-        # ]
-
         data = []
 
         # Use ProcessPoolExecutor for better Jupyter compatibility
@@ -246,6 +245,11 @@ class HOVConverter:
         return data_list
 
     def hov_to_midi(self, hov: np.ndarray, tempo_bpm: int = 120) -> PrettyMIDI:
+        """Convert an HOV matrix back to a PrettyMIDI object.
+
+        Expects hov of shape (seq_len, num_instruments, 3) with channels [hit, offset, velocity].
+        Offsets are in units of grid steps and are added directly to the note onset time.
+        """
         assert len(hov.shape) == 3, "HOV should have shape (seq_len, num_instruments, 3)"
         assert hov.shape[2] == 3, f"HOV dimension should have been 3 but was {hov.shape[2]}"
 

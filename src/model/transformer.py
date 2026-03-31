@@ -53,6 +53,17 @@ class DequantTransformer(nn.Module):
         self.tanh = nn.Tanh()
 
     def forward(self, encoder_input: torch.Tensor, decoder_input: torch.Tensor, pos_enc: torch.Tensor) -> torch.Tensor:
+        """Run a forward pass through the encoder-decoder transformer.
+
+        Args:
+            encoder_input: Hit activations of shape (batch, seq_len, num_instruments).
+            decoder_input: Offset+velocity pairs of shape (batch, seq_len, num_instruments, 2),
+                           shifted right by one step (teacher forcing).
+            pos_enc: Positional encoding of shape (batch, seq_len, 4).
+
+        Returns:
+            Predicted offset+velocity pairs of shape (batch, seq_len, num_instruments, 2).
+        """
         # Validate inputs
         assert encoder_input.dtype == torch.float32, f"encoder_input must be float32, not {encoder_input.dtype}"
         assert decoder_input.dtype == torch.float32, f"decoder_input must be float32, not {encoder_input.dtype}"
@@ -100,8 +111,7 @@ class DequantTransformer(nn.Module):
         y = self.output_proj(y)
         y = y.reshape(batch_size, seq_len, num_instruments, 2)
 
-        # Apply different activations to hits, offsets, and velocities
-        # hits: torch.Tensor = self.sigmoid(y[..., 0:1])
+        # Apply activations to offsets and velocities
         offsets: torch.Tensor = 0.5 * self.tanh(y[..., 0:1])
         velocities: torch.Tensor = self.sigmoid(y[..., 1:2])
 

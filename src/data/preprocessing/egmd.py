@@ -11,6 +11,7 @@ logger = logging.getLogger("egmd")
 
 
 def preprocess_egmd():
+    """Download the E-GMD dataset, convert each split to HOV format, and save as .npz files."""
     converter = HOVConverter(HOVConverterConfig(steps_per_beat=CONFIG.model.drums.steps_per_beat, categories=CONFIG.model.drums.categories, max_seq_len=CONFIG.model.max_seq_len))
 
     midi_filename = CONFIG.data.cache_dir / "egmd-midi.zip"

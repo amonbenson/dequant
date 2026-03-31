@@ -12,7 +12,7 @@ def run_quantize(input: Path, output: Path):
     midi = PrettyMIDI(input)
     tempo_bpm = converter.extract_tempo(midi)
 
-    # Load the midi file
+    # Convert it to HOV
     hov, _ = converter.midi_to_hov(midi, tempo_bpm=round(tempo_bpm))
 
     hov[..., 1] = 0  # Remove offset data

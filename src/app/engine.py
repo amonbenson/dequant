@@ -130,6 +130,7 @@ class MidiEngine:
             self._midi_out.send(msg)
 
     def _on_midi_message(self, msg):
+        """Handle an incoming MIDI message from the input port callback thread."""
         with self._lock:
             # Handle incoming messages
             match msg.type:

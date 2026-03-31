@@ -42,6 +42,7 @@ class Encoder(nn.Module):
         self.resid_dropout2 = nn.Dropout(config.dropout)  # after FFN
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply one encoder block (bidirectional self-attention + FFN) to x of shape (B, T, C)."""
         B, T, C = x.shape
         n_heads = self.config.n_heads
         d_head = self.d_head
